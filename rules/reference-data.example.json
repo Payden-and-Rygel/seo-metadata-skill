@@ -1,0 +1,19 @@
+{
+  "_comment": "Example shape for a static category/product tagging reference list, used by the keywords spec's alignment-tagging step. Replace with your own categories/products, or delete this file and the keywords-spec section that references it if you don't need this feature.",
+  "categories": {
+    "Example Category A": {
+      "categoryTag": "Example Category A",
+      "items": [
+        { "name": "Example Sub-item 1", "aliases": ["Item 1 nickname"] },
+        { "name": "Example Sub-item 2" }
+      ]
+    },
+    "Example Category B": {
+      "categoryTag": "Example Category B",
+      "items": [{ "name": "Example Sub-item 3" }]
+    }
+  },
+  "notes": [
+    "This list is static and must be updated by hand whenever your organization's categories/products change."
+  ]
+}

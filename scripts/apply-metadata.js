@@ -1,7 +1,7 @@
 require('dotenv').config();
-const fs = require('fs');
 const { managementRequest } = require('../lib/contentful-client');
 const { loadRows } = require('./export-metadata');
+const { loadConfig } = require('../lib/config');
 
 const LOCALE = process.env.CONTENTFUL_LOCALE || 'en-US';
 
@@ -9,20 +9,8 @@ async function getEntry(entryId) {
   return managementRequest(`/entries/${entryId}`);
 }
 
-async function updateSeoMetadataEntry(seoEntryId, { title, description, keywords }) {
-  const entry = await getEntry(seoEntryId);
-  entry.fields.title = { ...entry.fields.title, [LOCALE]: title };
-  entry.fields.description = { ...entry.fields.description, [LOCALE]: description };
-  entry.fields.keywords = {
-    ...entry.fields.keywords,
-    [LOCALE]: Array.isArray(keywords) ? keywords : String(keywords).split(',').map((k) => k.trim()),
-  };
-
-  return managementRequest(`/entries/${seoEntryId}`, {
-    method: 'PUT',
-    headers: { 'X-Contentful-Version': String(entry.sys.version) },
-    body: JSON.stringify({ fields: entry.fields }),
-  });
+function setLocaleField(entry, fieldName, value) {
+  entry.fields[fieldName] = { ...entry.fields[fieldName], [LOCALE]: value };
 }
 
 async function publishEntry(entryId, version) {
@@ -32,38 +20,94 @@ async function publishEntry(entryId, version) {
   });
 }
 
-async function applyRow(row, { write, publish }) {
-  if (!row.entryId) {
-    throw new Error(`Row for slug "${row.slug}" has no entryId — cannot apply without the Contentful entry sys.id`);
-  }
+function keywordsArray(keywords) {
+  return Array.isArray(keywords) ? keywords : String(keywords).split(',').map((k) => k.trim());
+}
 
+async function applyRowLinkedEntry(row, seoCfg, { write, publish }) {
   const articleEntry = await getEntry(row.entryId);
-  const seoLink = articleEntry.fields.seoMetadata && articleEntry.fields.seoMetadata[LOCALE];
+  const seoLink = articleEntry.fields[seoCfg.field] && articleEntry.fields[seoCfg.field][LOCALE];
   if (!seoLink || !seoLink.sys) {
     throw new Error(
-      `Article "${row.slug}" (${row.entryId}) has no linked seoMetadata entry yet — create one in Contentful first, this tool only updates existing entries.`
+      `Entry "${row.slug}" (${row.entryId}) has no linked "${seoCfg.field}" entry yet — create one in Contentful first, this tool only updates existing entries.`
     );
   }
   const seoEntryId = seoLink.sys.id;
 
   if (!write) {
-    console.error(`[dry run] would update seoMetadata entry ${seoEntryId} for "${row.slug}"`);
+    console.error(`[dry run] would update linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}"`);
     return;
   }
 
-  const updated = await updateSeoMetadataEntry(seoEntryId, row);
-  console.error(`Updated seoMetadata entry ${seoEntryId} for "${row.slug}" (draft, not published)`);
+  const seoEntry = await getEntry(seoEntryId);
+  setLocaleField(seoEntry, seoCfg.titleField, row.title);
+  setLocaleField(seoEntry, seoCfg.descriptionField, row.description);
+  setLocaleField(seoEntry, seoCfg.keywordsField, keywordsArray(row.keywords));
+
+  const updated = await managementRequest(`/entries/${seoEntryId}`, {
+    method: 'PUT',
+    headers: { 'X-Contentful-Version': String(seoEntry.sys.version) },
+    body: JSON.stringify({ fields: seoEntry.fields }),
+  });
+  console.error(`Updated linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}" (draft, not published)`);
 
   if (publish) {
     await publishEntry(seoEntryId, updated.sys.version);
-    console.error(`Published seoMetadata entry ${seoEntryId}`);
+    console.error(`Published "${seoCfg.field}" entry ${seoEntryId}`);
   }
 }
 
+async function applyRowInline(row, seoCfg, { write, publish }) {
+  if (!write) {
+    console.error(`[dry run] would update inline "${seoCfg.field}" fields on ${row.entryId} for "${row.slug}"`);
+    return;
+  }
+
+  const entry = await getEntry(row.entryId);
+  const current = (entry.fields[seoCfg.field] && entry.fields[seoCfg.field][LOCALE]) || {};
+  const nextValue = {
+    ...current,
+    [seoCfg.titleField]: row.title,
+    [seoCfg.descriptionField]: row.description,
+    [seoCfg.keywordsField]: keywordsArray(row.keywords),
+  };
+  entry.fields[seoCfg.field] = { ...entry.fields[seoCfg.field], [LOCALE]: nextValue };
+
+  const updated = await managementRequest(`/entries/${row.entryId}`, {
+    method: 'PUT',
+    headers: { 'X-Contentful-Version': String(entry.sys.version) },
+    body: JSON.stringify({ fields: entry.fields }),
+  });
+  console.error(`Updated inline "${seoCfg.field}" field on ${row.entryId} for "${row.slug}" (draft, not published)`);
+
+  if (publish) {
+    await publishEntry(row.entryId, updated.sys.version);
+    console.error(`Published entry ${row.entryId}`);
+  }
+}
+
+async function applyRow(row, seoCfg, opts) {
+  if (!row.entryId) {
+    throw new Error(`Row for slug "${row.slug}" has no entryId — cannot apply without the Contentful entry sys.id`);
+  }
+  if (seoCfg.mode === 'inline') {
+    return applyRowInline(row, seoCfg, opts);
+  }
+  return applyRowLinkedEntry(row, seoCfg, opts);
+}
+
 async function run(opts) {
-  const rows = loadRows(opts.input);
+  const { config } = loadConfig(opts.config);
+  const seoCfg = config.contentful && config.contentful.seoMetadata;
+  if (!seoCfg || !seoCfg.field || !seoCfg.titleField || !seoCfg.descriptionField || !seoCfg.keywordsField) {
+    throw new Error(
+      'Config is missing "contentful.seoMetadata" (field, mode, titleField, descriptionField, keywordsField) — required for `apply`'
+    );
+  }
+
+  const rows = loadRows(opts.input, config.rules || {});
   for (const row of rows) {
-    await applyRow(row, { write: !!opts.write, publish: !!opts.publish });
+    await applyRow(row, seoCfg, { write: !!opts.write, publish: !!opts.publish });
   }
   if (!opts.write) {
     console.error('\nDry run only — no changes were made. Re-run with --write to apply.');

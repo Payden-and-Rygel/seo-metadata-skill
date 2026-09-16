@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
+const { loadConfig } = require('../lib/config');
 
 const REQUIRED_FIELDS = ['slug', 'title', 'description', 'keywords'];
 
-function loadRows(inputFile) {
+function loadRows(inputFile, rules = {}) {
   const raw = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
   const rows = Array.isArray(raw) ? raw : [raw];
   rows.forEach((row, i) => {
@@ -12,11 +13,11 @@ function loadRows(inputFile) {
     if (missing.length) {
       throw new Error(`Row ${i} (${row.slug || row.entryId || '?'}) is missing field(s): ${missing.join(', ')}`);
     }
-    if (row.title.length > 256) {
-      throw new Error(`Row ${i} (${row.slug}) title exceeds 256 chars (${row.title.length})`);
+    if (rules.titleMaxLength && row.title.length > rules.titleMaxLength) {
+      throw new Error(`Row ${i} (${row.slug}) title exceeds ${rules.titleMaxLength} chars (${row.title.length})`);
     }
-    if (row.description.length > 130) {
-      throw new Error(`Row ${i} (${row.slug}) description exceeds 130 chars (${row.description.length})`);
+    if (rules.descriptionMaxLength && row.description.length > rules.descriptionMaxLength) {
+      throw new Error(`Row ${i} (${row.slug}) description exceeds ${rules.descriptionMaxLength} chars (${row.description.length})`);
     }
   });
   return rows;
@@ -41,8 +42,16 @@ function toExcel(rows, outFile) {
 }
 
 function run(opts) {
-  const rows = loadRows(opts.input);
-  const outDir = opts.out || 'seo-metadata-work';
+  let rules = {};
+  try {
+    rules = loadConfig(opts.config).config.rules || {};
+  } catch (err) {
+    // Config is optional for export (only used for length-cap validation) —
+    // fall back to no caps rather than forcing every project to have one.
+  }
+
+  const rows = loadRows(opts.input, rules);
+  const outDir = path.resolve(opts.out || 'seo-metadata-work');
   fs.mkdirSync(outDir, { recursive: true });
 
   const format = opts.format || 'both';

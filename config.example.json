@@ -1,0 +1,41 @@
+{
+  "_comment": "Copy this file to seo-metadata.config.json in your project and fill in your own Contentful content type / field names. Nothing here is enforced by Contentful's schema — it's just telling the skill what your schema looks like. See examples/payden-and-rygel/config.json for a filled-in example.",
+
+  "contentful": {
+    "contentType": "YourContentTypeId",
+
+    "fields": {
+      "slug": "slug",
+      "series": null,
+      "select": [
+        "title",
+        "slug",
+        "publishedDate",
+        "content { json }",
+        "seoMetadata { sys { id } title description keywords }"
+      ]
+    },
+
+    "hubContentType": null,
+    "hubFields": null,
+
+    "seoMetadata": {
+      "mode": "linkedEntry",
+      "field": "seoMetadata",
+      "titleField": "title",
+      "descriptionField": "description",
+      "keywordsField": "keywords",
+      "missingCheckFields": ["title", "description"]
+    }
+  },
+
+  "rules": {
+    "_comment": "Copy rules/*.template.md to these paths (dropping .template) and fill in your own rules. reference-data.example.json is optional — only needed if you use category/product alignment tagging.",
+    "titleSpec": "./rules/title-spec.md",
+    "descriptionSpec": "./rules/description-spec.md",
+    "keywordsSpec": "./rules/keywords-spec.md",
+    "referenceData": "./rules/reference-data.json",
+    "titleMaxLength": null,
+    "descriptionMaxLength": null
+  }
+}

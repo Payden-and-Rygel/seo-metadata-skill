@@ -1,0 +1,55 @@
+{
+  "_comment": "Worked example for payden.com's Contentful space. Copy this to your project root as seo-metadata.config.json (and copy this folder's rules/ + reference-data.json alongside it) to reuse as-is.",
+
+  "contentful": {
+    "contentType": "Article",
+
+    "fields": {
+      "slug": "slug",
+      "series": "series",
+      "select": [
+        "title",
+        "slug",
+        "summary",
+        "publishedDate",
+        "series",
+        "strategy",
+        "subStrategy",
+        "type",
+        "thumbnailImage { url title }",
+        "hero { eyebrowText heading image { url title } }",
+        "content { json }",
+        "seoMetadata { sys { id } title description keywords canonicalUrl imagesCollection(limit: 3) { items { url title } } }"
+      ]
+    },
+
+    "hubContentType": "PointOfViewPage",
+    "hubFields": {
+      "slug": "slug",
+      "select": [
+        "title",
+        "slug",
+        "seoMetadata { sys { id } title description keywords }",
+        "articlesCollection(limit: 20) { items { title slug series } }"
+      ]
+    },
+
+    "seoMetadata": {
+      "mode": "linkedEntry",
+      "field": "seoMetadata",
+      "titleField": "title",
+      "descriptionField": "description",
+      "keywordsField": "keywords",
+      "missingCheckFields": ["title", "description"]
+    }
+  },
+
+  "rules": {
+    "titleSpec": "./rules/title-spec.md",
+    "descriptionSpec": "./rules/description-spec.md",
+    "keywordsSpec": "./rules/keywords-spec.md",
+    "referenceData": "./reference-data.json",
+    "titleMaxLength": 256,
+    "descriptionMaxLength": 130
+  }
+}
