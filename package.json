@@ -1,0 +1,26 @@
+{
+  "name": "seo-metadata-skill",
+  "version": "1.0.0",
+  "description": "Claude Code skill for generating SEO metadata (Title/Description/Keywords) for Contentful article entries, per Payden & Rygel's editorial spec.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "bin": {
+    "seo-metadata-skill": "bin/seo-metadata-skill.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "lib",
+    "references",
+    "SKILL.md",
+    ".env.example"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

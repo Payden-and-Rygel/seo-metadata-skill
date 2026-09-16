@@ -1,0 +1,88 @@
+{
+  "_note": "Static reference, manually maintained. Reflects payden.com as of 2026-08-19. Update by hand whenever a strategy or fund is launched, retired, or renamed — there is no automatic sync.",
+  "strategies": {
+    "Fixed Income": {
+      "categoryTag": "Fixed Income Strategy",
+      "subStrategies": [
+        { "name": "Core & Core Plus Strategy", "aliases": ["Core Bond"] },
+        { "name": "Enhanced Cash & Low Duration" },
+        { "name": "Emerging Markets Debt" },
+        { "name": "Global Fixed Income" },
+        { "name": "GNMA" },
+        { "name": "High Yield" },
+        { "name": "Investment Grade Corporates" },
+        { "name": "Liability Driven Investing (LDI)" },
+        { "name": "Municipal" },
+        { "name": "Securitized Income" },
+        { "name": "Strategic Income" },
+        { "name": "U.S. Government Bonds" }
+      ]
+    },
+    "Unconstrained": {
+      "categoryTag": "Unconstrained Strategy",
+      "subStrategies": [
+        { "name": "Absolute Return Strategy", "aliases": ["PARI"] },
+        { "name": "Multi-Asset Credit Strategy" }
+      ]
+    },
+    "Balanced": {
+      "categoryTag": "Balanced Strategy",
+      "subStrategies": [
+        { "name": "U.S. Balanced Strategy" },
+        { "name": "Global Balanced Strategy" }
+      ]
+    },
+    "Equity": {
+      "categoryTag": "Equity Strategy",
+      "subStrategies": [
+        { "name": "Equity Income Strategy" }
+      ]
+    }
+  },
+  "funds": {
+    "U.S. Funds": [
+      "Payden Absolute Return Bond Fund",
+      "Payden California Municipal Social Impact Fund",
+      "Payden Cash Reserves Money Market Fund",
+      "Payden Core Bond Fund",
+      "Payden Corporate Bond Fund",
+      "Payden Emerging Markets Bond Fund",
+      "Payden Emerging Markets Corporate Bond Fund",
+      "Payden Emerging Markets Local Bond Fund",
+      "Payden Equity Income Fund",
+      "Payden Floating Rate Fund",
+      "Payden Global Fixed Income Fund",
+      "Payden Global Low Duration Fund",
+      "Payden GNMA Fund",
+      "Payden High Income Fund",
+      "Payden Limited Maturity Fund",
+      "Payden Low Duration Fund",
+      "Payden Managed Income Fund",
+      "Payden Securitized Income Fund",
+      "Payden Strategic Income Fund",
+      "Payden U.S. Government Fund"
+    ],
+    "UCITS Funds": [
+      "Payden Absolute Return Bond Fund",
+      "Payden Global Aggregate Bond Fund",
+      "Payden Global Emerging Markets Bond Fund",
+      "Payden Global Equity Income Fund",
+      "Payden Global Government Bond Index Fund",
+      "Payden Global High Yield Bond Fund",
+      "Payden Global Inflation-Linked Bond Fund",
+      "Payden Global Investment Grade Corporate Bond Fund",
+      "Payden Global Short Bond Fund",
+      "Payden Sterling Reserve Fund",
+      "Payden US Core Bond Fund",
+      "Payden US Dollar Liquidity Fund",
+      "Payden USD Low Duration Credit Fund"
+    ],
+    "AIF": [
+      "Payden Multi Asset Credit Fund"
+    ]
+  },
+  "notes": [
+    "Fund tagging is at the fund-family level — do not tag individual share classes separately.",
+    "Only one confirmed alias today: \"Core Bond\" = \"Core & Core Plus Strategy\". Unlisted nicknames cannot be inferred — add them here explicitly if confirmed."
+  ]
+}
