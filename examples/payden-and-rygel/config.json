@@ -58,7 +58,7 @@
     "descriptionMaxLength": 130
   },
   "canonicalUrl": {
-    "_comment": "Mirrors payden.com routing (src/app/insights/...). Articles linked from a PointOfViewPage canonicalize to the nested PoV path; everything else to /insights/<slug>.",
+    "_comment": "Matches the URLs www.payden.com serves: articles linked from a PointOfViewPage use the nested PoV path; everything else uses /insights/<slug>.",
     "baseUrl": "https://www.payden.com",
     "rules": [
       {
@@ -70,7 +70,7 @@
     "trailingSlash": false
   },
   "schema": {
-    "_comment": "payden.com spreads richResultSchema over its built-in Article default (src/app/insights/[...slug]/page.tsx), so keys here override it. headline, image and dateModified are left to the site's default (hero heading, thumbnail, sys.publishedAt) so they never go stale; this template adds the SEO description, keywords and mainEntityOfPage.",
+    "_comment": "Article pages already output default Article JSON-LD and richResultSchema keys override it. headline, image and dateModified are left to the page default so they never go stale; this template adds the SEO description, keywords and mainEntityOfPage.",
     "template": {
       "@context": "https://schema.org",
       "@type": "Article",
