@@ -1,16 +1,23 @@
 require('dotenv').config();
 const { managementRequest } = require('../lib/contentful-client');
 const { loadRows } = require('./export-metadata');
-const { loadConfig } = require('../lib/config');
+const { loadConfig, resolveLocale } = require('../lib/config');
 
-const LOCALE = process.env.CONTENTFUL_LOCALE || 'en-US';
+const DEFAULT_LOCALE = 'en-US';
+
+// Row key -> config key naming the Contentful field it's written to. Only
+// fields that are mapped in config AND present on the row are written.
+const FIELD_MAP = [
+  ['title', 'titleField'],
+  ['subtitle', 'subtitleField'],
+  ['description', 'descriptionField'],
+  ['keywords', 'keywordsField'],
+  ['canonicalUrl', 'canonicalUrlField'],
+  ['schema', 'schemaField'],
+];
 
 async function getEntry(entryId) {
   return managementRequest(`/entries/${entryId}`);
-}
-
-function setLocaleField(entry, fieldName, value) {
-  entry.fields[fieldName] = { ...entry.fields[fieldName], [LOCALE]: value };
 }
 
 async function publishEntry(entryId, version) {
@@ -24,9 +31,21 @@ function keywordsArray(keywords) {
   return Array.isArray(keywords) ? keywords : String(keywords).split(',').map((k) => k.trim());
 }
 
-async function applyRowLinkedEntry(row, seoCfg, { write, publish }) {
+// Returns { contentfulFieldName: value } for every mapped field the row has.
+function fieldValues(row, seoCfg) {
+  const values = {};
+  for (const [rowKey, cfgKey] of FIELD_MAP) {
+    const fieldName = seoCfg[cfgKey];
+    if (!fieldName || row[rowKey] === undefined || row[rowKey] === null || row[rowKey] === '') continue;
+    values[fieldName] = rowKey === 'keywords' ? keywordsArray(row[rowKey]) : row[rowKey];
+  }
+  return values;
+}
+
+async function applyRowLinkedEntry(row, seoCfg, { write, publish, locale }) {
+  const values = fieldValues(row, seoCfg);
   const articleEntry = await getEntry(row.entryId);
-  const seoLink = articleEntry.fields[seoCfg.field] && articleEntry.fields[seoCfg.field][LOCALE];
+  const seoLink = articleEntry.fields[seoCfg.field] && articleEntry.fields[seoCfg.field][locale];
   if (!seoLink || !seoLink.sys) {
     throw new Error(
       `Entry "${row.slug}" (${row.entryId}) has no linked "${seoCfg.field}" entry yet — create one in Contentful first, this tool only updates existing entries.`
@@ -35,21 +54,21 @@ async function applyRowLinkedEntry(row, seoCfg, { write, publish }) {
   const seoEntryId = seoLink.sys.id;
 
   if (!write) {
-    console.error(`[dry run] would update linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}"`);
+    console.error(`[dry run] would update linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}" (${locale}): ${Object.keys(values).join(', ')}`);
     return;
   }
 
   const seoEntry = await getEntry(seoEntryId);
-  setLocaleField(seoEntry, seoCfg.titleField, row.title);
-  setLocaleField(seoEntry, seoCfg.descriptionField, row.description);
-  setLocaleField(seoEntry, seoCfg.keywordsField, keywordsArray(row.keywords));
+  for (const [fieldName, value] of Object.entries(values)) {
+    seoEntry.fields[fieldName] = { ...seoEntry.fields[fieldName], [locale]: value };
+  }
 
   const updated = await managementRequest(`/entries/${seoEntryId}`, {
     method: 'PUT',
     headers: { 'X-Contentful-Version': String(seoEntry.sys.version) },
     body: JSON.stringify({ fields: seoEntry.fields }),
   });
-  console.error(`Updated linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}" (draft, not published)`);
+  console.error(`Updated linked "${seoCfg.field}" entry ${seoEntryId} for "${row.slug}" (${Object.keys(values).join(', ')}; draft, not published)`);
 
   if (publish) {
     await publishEntry(seoEntryId, updated.sys.version);
@@ -57,28 +76,23 @@ async function applyRowLinkedEntry(row, seoCfg, { write, publish }) {
   }
 }
 
-async function applyRowInline(row, seoCfg, { write, publish }) {
+async function applyRowInline(row, seoCfg, { write, publish, locale }) {
+  const values = fieldValues(row, seoCfg);
   if (!write) {
-    console.error(`[dry run] would update inline "${seoCfg.field}" fields on ${row.entryId} for "${row.slug}"`);
+    console.error(`[dry run] would update inline "${seoCfg.field}" fields on ${row.entryId} for "${row.slug}" (${locale}): ${Object.keys(values).join(', ')}`);
     return;
   }
 
   const entry = await getEntry(row.entryId);
-  const current = (entry.fields[seoCfg.field] && entry.fields[seoCfg.field][LOCALE]) || {};
-  const nextValue = {
-    ...current,
-    [seoCfg.titleField]: row.title,
-    [seoCfg.descriptionField]: row.description,
-    [seoCfg.keywordsField]: keywordsArray(row.keywords),
-  };
-  entry.fields[seoCfg.field] = { ...entry.fields[seoCfg.field], [LOCALE]: nextValue };
+  const current = (entry.fields[seoCfg.field] && entry.fields[seoCfg.field][locale]) || {};
+  entry.fields[seoCfg.field] = { ...entry.fields[seoCfg.field], [locale]: { ...current, ...values } };
 
   const updated = await managementRequest(`/entries/${row.entryId}`, {
     method: 'PUT',
     headers: { 'X-Contentful-Version': String(entry.sys.version) },
     body: JSON.stringify({ fields: entry.fields }),
   });
-  console.error(`Updated inline "${seoCfg.field}" field on ${row.entryId} for "${row.slug}" (draft, not published)`);
+  console.error(`Updated inline "${seoCfg.field}" field on ${row.entryId} for "${row.slug}" (${Object.keys(values).join(', ')}; draft, not published)`);
 
   if (publish) {
     await publishEntry(row.entryId, updated.sys.version);
@@ -104,14 +118,15 @@ async function run(opts) {
       'Config is missing "contentful.seoMetadata" (field, mode, titleField, descriptionField, keywordsField) — required for `apply`'
     );
   }
+  const locale = resolveLocale(opts.locale, config) || DEFAULT_LOCALE;
 
   const rows = loadRows(opts.input, config.rules || {});
   for (const row of rows) {
-    await applyRow(row, seoCfg, { write: !!opts.write, publish: !!opts.publish });
+    await applyRow(row, seoCfg, { write: !!opts.write, publish: !!opts.publish, locale });
   }
   if (!opts.write) {
     console.error('\nDry run only — no changes were made. Re-run with --write to apply.');
   }
 }
 
-module.exports = { run };
+module.exports = { run, fieldValues };

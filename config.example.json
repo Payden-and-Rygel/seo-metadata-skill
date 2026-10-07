@@ -1,9 +1,7 @@
 {
   "_comment": "Copy this file to seo-metadata.config.json in your project and fill in your own Contentful content type / field names. Nothing here is enforced by Contentful's schema — it's just telling the skill what your schema looks like. See examples/payden-and-rygel/config.json for a filled-in example.",
-
   "contentful": {
     "contentType": "YourContentTypeId",
-
     "fields": {
       "slug": "slug",
       "series": null,
@@ -12,30 +10,69 @@
         "slug",
         "publishedDate",
         "content { json }",
-        "seoMetadata { sys { id } title description keywords }"
-      ]
+        "seoMetadata { sys { id } title description keywords canonicalUrl schema }"
+      ],
+      "richText": [
+        "content.json"
+      ],
+      "plainTextMaxChars": 8000
     },
-
     "hubContentType": null,
     "hubFields": null,
-
     "seoMetadata": {
       "mode": "linkedEntry",
       "field": "seoMetadata",
       "titleField": "title",
+      "subtitleField": null,
       "descriptionField": "description",
       "keywordsField": "keywords",
-      "missingCheckFields": ["title", "description"]
-    }
+      "canonicalUrlField": "canonicalUrl",
+      "schemaField": "schema",
+      "missingCheckFields": [
+        "title",
+        "description"
+      ]
+    },
+    "locale": null
   },
-
   "rules": {
-    "_comment": "Copy rules/*.template.md to these paths (dropping .template) and fill in your own rules. reference-data.example.json is optional — only needed if you use category/product alignment tagging.",
+    "_comment": "Copy rules/*.template.md to these paths (dropping .template) and fill in your own rules. reference-data.example.json is optional — only needed if you use category/product alignment tagging. subtitleSpec is optional — set it (and contentful.seoMetadata.subtitleField) only if your SEO metadata has a Subtitle field.",
     "titleSpec": "./rules/title-spec.md",
+    "subtitleSpec": null,
     "descriptionSpec": "./rules/description-spec.md",
     "keywordsSpec": "./rules/keywords-spec.md",
     "referenceData": "./rules/reference-data.json",
     "titleMaxLength": null,
+    "subtitleMaxLength": null,
     "descriptionMaxLength": null
+  },
+  "canonicalUrl": {
+    "_comment": "Canonical URL is built by `derive`, never drafted. Tokens like {slug} read from the fetched entry (dot paths; numeric segments index arrays). The first rule whose `when` path is non-empty wins; otherwise `default` is used. Remove this block if you do not manage canonical URLs.",
+    "baseUrl": "https://www.example.com",
+    "rules": [
+      {
+        "when": "linkedFrom.parentPageCollection.items.0.slug",
+        "pattern": "/section/{linkedFrom.parentPageCollection.items.0.slug}/{slug}"
+      }
+    ],
+    "default": "/section/{slug}",
+    "trailingSlash": false
+  },
+  "schema": {
+    "_comment": "JSON-LD built by `derive`. {path} reads the fetched entry, {row.x} the drafted row, {canonicalUrl} the derived URL. Filters: |date (YYYY-MM-DD), |join. A string that is a single token keeps its native type (arrays stay arrays). Anything that resolves empty is dropped. Remove this block if you do not manage schema.",
+    "template": {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "{title}",
+      "description": "{row.description}",
+      "keywords": "{row.keywords}",
+      "datePublished": "{publishedDate|date}",
+      "mainEntityOfPage": "{canonicalUrl}",
+      "publisher": {
+        "@type": "Organization",
+        "name": "<Your Brand Name>",
+        "url": "https://www.example.com/"
+      }
+    }
   }
 }

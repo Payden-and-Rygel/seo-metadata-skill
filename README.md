@@ -1,6 +1,6 @@
 # seo-metadata-skill
 
-A Claude Code skill that generates SEO metadata (Title / Description / Keywords) for Contentful entries, following a **project-specific** config and rule set, and exports the result to JSON/Excel or applies it back to Contentful.
+A Claude Code skill that generates SEO metadata (Title / Subtitle / Description / Keywords, plus a derived Canonical URL and Schema JSON-LD) for Contentful entries, following a **project-specific** config and rule set, and exports the result to JSON/Excel or applies it back to Contentful.
 
 This skill ships with no built-in knowledge of any particular Contentful space, content type, or editorial rulebook — you configure those per project.
 
@@ -30,12 +30,16 @@ If your project already has a filled-in example under `examples/`, copy that ins
 
 ```
 node bin/seo-metadata-skill.js fetch --slug <slug>
+node bin/seo-metadata-skill.js fetch --all --only-missing --preview --chunk-size 20
+node bin/seo-metadata-skill.js derive --input seo-metadata-work/generated-metadata.json --fetched seo-metadata-work/fetched-entries.json
 node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metadata.json
 node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write
+npm test
 ```
 
 ## What it does / doesn't do
 
+- **Canonical URL and Schema are derived, not drafted** — `derive` builds them from URL/JSON-LD templates in your config plus the fetched entry, so they always match your site's routing.
 - **Fetching and exporting are mechanical** (plain Contentful GraphQL/Management API calls, built from your config — no LLM involved).
 - **Drafting the actual Title/Description/Keywords values requires judgment** — reading full entry bodies, applying whatever compliance rules your project defines, following your per-content-type templates, etc. That part is driven by Claude following [SKILL.md](SKILL.md) and your own `rules/*.md`, not by a deterministic script.
 - Writing back to Contentful (`apply --write`) is opt-in and defaults to a dry run; it supports both a linked "SEO metadata" entry and inline fields on the entry itself, configurable per project.

@@ -15,6 +15,9 @@
     "SKILL.md",
     ".env.example"
   ],
+  "scripts": {
+    "test": "node --test"
+  },
   "engines": {
     "node": ">=18"
   },

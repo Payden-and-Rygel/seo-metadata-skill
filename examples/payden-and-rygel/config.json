@@ -1,9 +1,7 @@
 {
   "_comment": "Worked example for payden.com's Contentful space. Copy this to your project root as seo-metadata.config.json (and copy this folder's rules/ + reference-data.json alongside it) to reuse as-is.",
-
   "contentful": {
     "contentType": "Article",
-
     "fields": {
       "slug": "slug",
       "series": "series",
@@ -19,10 +17,14 @@
         "thumbnailImage { url title }",
         "hero { eyebrowText heading image { url title } }",
         "content { json }",
-        "seoMetadata { sys { id } title description keywords canonicalUrl imagesCollection(limit: 3) { items { url title } } }"
-      ]
+        "seoMetadata { sys { id } title description keywords canonicalUrl richResultSchema imagesCollection(limit: 3) { items { url title } } }",
+        "linkedFrom { pointOfViewPageCollection(limit: 1) { items { slug } } }"
+      ],
+      "richText": [
+        "content.json"
+      ],
+      "plainTextMaxChars": 12000
     },
-
     "hubContentType": "PointOfViewPage",
     "hubFields": {
       "slug": "slug",
@@ -33,17 +35,20 @@
         "articlesCollection(limit: 20) { items { title slug series } }"
       ]
     },
-
     "seoMetadata": {
       "mode": "linkedEntry",
       "field": "seoMetadata",
       "titleField": "title",
       "descriptionField": "description",
       "keywordsField": "keywords",
-      "missingCheckFields": ["title", "description"]
+      "canonicalUrlField": "canonicalUrl",
+      "schemaField": "richResultSchema",
+      "missingCheckFields": [
+        "title",
+        "description"
+      ]
     }
   },
-
   "rules": {
     "titleSpec": "./rules/title-spec.md",
     "descriptionSpec": "./rules/description-spec.md",
@@ -51,5 +56,40 @@
     "referenceData": "./reference-data.json",
     "titleMaxLength": 256,
     "descriptionMaxLength": 130
+  },
+  "canonicalUrl": {
+    "_comment": "Mirrors payden.com routing (src/app/insights/...). Articles linked from a PointOfViewPage canonicalize to the nested PoV path; everything else to /insights/<slug>.",
+    "baseUrl": "https://www.payden.com",
+    "rules": [
+      {
+        "when": "linkedFrom.pointOfViewPageCollection.items.0.slug",
+        "pattern": "/insights/point-of-view/{linkedFrom.pointOfViewPageCollection.items.0.slug}/{slug}"
+      }
+    ],
+    "default": "/insights/{slug}",
+    "trailingSlash": false
+  },
+  "schema": {
+    "_comment": "payden.com spreads richResultSchema over its built-in Article default (src/app/insights/[...slug]/page.tsx), so keys here override it. headline, image and dateModified are left to the site's default (hero heading, thumbnail, sys.publishedAt) so they never go stale; this template adds the SEO description, keywords and mainEntityOfPage.",
+    "template": {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "description": "{row.description}",
+      "keywords": "{row.keywords}",
+      "datePublished": "{publishedDate|date}",
+      "mainEntityOfPage": "{canonicalUrl}",
+      "author": [
+        {
+          "url": "https://www.payden.com/",
+          "name": "Payden & Rygel",
+          "@type": "Organization"
+        }
+      ],
+      "publisher": {
+        "url": "https://www.payden.com/",
+        "name": "Payden & Rygel",
+        "@type": "Organization"
+      }
+    }
   }
 }
