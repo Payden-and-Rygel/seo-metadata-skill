@@ -73,24 +73,21 @@ npm test          # optional: runs the unit tests
 
 ## Set up a project
 
+> **Easiest:** just start using the skill in Claude Code (terminal or desktop app). On the first run Claude checks the saved credentials. If the space ID or access token is missing, Claude asks you for them and saves them once for you. Later runs, in any project, reuse them. No `.env` file is used.
+
 ### Option A — Payden & Rygel (ready-made config)
 
 ```bash
 cp examples/payden-and-rygel/config.json ./seo-metadata.config.json
 cp -r examples/payden-and-rygel/rules ./rules
 cp examples/payden-and-rygel/reference-data.json ./rules/reference-data.json
-cp .env.example .env
 ```
 
-Fill in `.env`:
+Save your Contentful credentials once (see [Credentials](#credentials)):
 
-```dotenv
-CONTENTFUL_SPACE_ID=<payden space id>
-CONTENTFUL_ACCESS_TOKEN=<delivery API token>        # required: read published content
-CONTENTFUL_PREVIEW_TOKEN=<preview API token>        # optional: only for --preview (drafts)
-CONTENTFUL_ENVIRONMENT_ID=marketing-v2              # payden.com does NOT use "master"
-CONTENTFUL_LOCALE=en-US
-CONTENTFUL_MANAGEMENT_TOKEN=<CMA token>             # optional: only for apply --write
+```bash
+node bin/seo-metadata-skill.js setup --environment-id marketing-v2   # payden.com does NOT use "master"
+node bin/seo-metadata-skill.js setup        # asks for the space ID and access token
 ```
 
 Check the setup with a single entry:
@@ -103,7 +100,6 @@ node bin/seo-metadata-skill.js fetch --slug pov-2025-vol-02-drone-delivery
 ### Option B — a new project
 
 ```bash
-cp .env.example .env                                  # fill in your Contentful credentials
 cp config.example.json ./seo-metadata.config.json      # describe your content type + fields
 mkdir -p rules
 cp rules/title-spec.template.md        rules/title-spec.md
@@ -114,32 +110,53 @@ cp rules/subtitle-spec.template.md     rules/subtitle-spec.md   # only if you ha
 
 Then:
 
-1. **Edit `seo-metadata.config.json`.** At minimum, set the following (see the [Config reference](#config-reference)):
+1. **Save your Contentful credentials** with `node bin/seo-metadata-skill.js setup` (see [Credentials](#credentials)).
+2. **Edit `seo-metadata.config.json`.** At minimum, set the following (see the [Config reference](#config-reference)):
    - `contentful.contentType`
    - `contentful.fields.select`
    - `contentful.seoMetadata`
    - `canonicalUrl`
    - `schema`
-2. **Replace every `<...>` placeholder in `rules/*.md`** with your real editorial rules. These are what Claude follows when drafting, so be specific about templates, character limits, and compliance rules.
-3. **Check the setup** with `fetch --slug <some-slug>`.
+3. **Replace every `<...>` placeholder in `rules/*.md`** with your real editorial rules. These are what Claude follows when drafting, so be specific about templates, character limits, and compliance rules.
+4. **Check the setup** with `fetch --slug <some-slug>`.
 
-### Environment variables
+### Credentials
 
-| Variable | Needed for | Notes |
+Credentials are saved **once per user**, outside every project, in `~/.config/seo-metadata-skill/credentials.json` (file mode 600). Nothing is read from a `.env` file.
+
+```bash
+node bin/seo-metadata-skill.js setup                       # show what's saved (tokens masked); in a terminal, asks for anything missing
+node bin/seo-metadata-skill.js setup --space-id <id> --access-token <token>
+node bin/seo-metadata-skill.js setup --management-token <token>   # only when you need apply --write
+node bin/seo-metadata-skill.js setup --clear               # delete everything saved
+```
+
+If a command needs a value that isn't saved, it asks you for it in an interactive terminal (tokens aren't echoed) and saves it. In a non-interactive shell it fails with the exact `setup` flag to use. Claude handles that by asking you in chat.
+
+| `setup` flag | Needed for | Notes |
 |---|---|---|
-| `CONTENTFUL_SPACE_ID` | everything | |
-| `CONTENTFUL_ACCESS_TOKEN` | `fetch` | Content Delivery API (published content) |
-| `CONTENTFUL_PREVIEW_TOKEN` | `fetch --preview` | Content Preview API (drafts) |
-| `CONTENTFUL_ENVIRONMENT_ID` | everything | defaults to `master` |
-| `CONTENTFUL_LOCALE` | fetch / apply | overridden by `--locale` or `contentful.locale` in config |
-| `CONTENTFUL_MANAGEMENT_TOKEN` | `apply` | Content Management API, write access |
-| `SEO_METADATA_CONFIG` | all | alternative to `--config <path>` |
+| `--space-id` | everything | |
+| `--access-token` | `fetch` | Content Delivery API (published content) |
+| `--preview-token` | `fetch --preview` | Content Preview API (drafts) |
+| `--environment-id` | everything | defaults to `master` |
+| `--locale` | fetch / apply | overridden by `--locale` or `contentful.locale` in config |
+| `--management-token` | `apply --write` | Content Management API, write access |
+
+Environment variables with the matching name (`CONTENTFUL_SPACE_ID`, `CONTENTFUL_ACCESS_TOKEN`, `CONTENTFUL_PREVIEW_TOKEN`, `CONTENTFUL_ENVIRONMENT_ID`, `CONTENTFUL_LOCALE`, `CONTENTFUL_MANAGEMENT_TOKEN`) override the saved values, for example in CI. `SEO_METADATA_CREDENTIALS` changes where credentials are stored. `SEO_METADATA_CONFIG` is an alternative to `--config <path>`.
 
 ---
 
 ## Using it with Claude (recommended)
 
 Once the skill is installed and the project is set up, ask Claude in plain language. Claude runs the scripts, reads the content, drafts the metadata against your rules, and hands you a spreadsheet to review.
+
+If you just invoke the skill without saying what you want, Claude asks you in a short menu:
+
+1. **What would you like to do?** Generate SEO metadata · Re-export existing drafts · Apply reviewed metadata to Contentful · Check / update setup
+2. **Which entries?** (for Generate) Single entry · Multiple entries (a list of slugs or IDs) · All entries missing metadata · A series or hub page (only shown if your config has one)
+3. **Run options:** include unpublished drafts? Excel, JSON, or both?
+
+Then Claude asks only for what that choice needs, such as the slug or the list of slugs.
 
 **Example prompts:**
 
@@ -329,12 +346,18 @@ Check the entries in the Contentful web app. Publish them there, or re-run with 
 node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write --publish
 ```
 
-> Try `--write` against a sandbox environment first by setting `CONTENTFUL_ENVIRONMENT_ID`.
+> Try `--write` against a sandbox environment first: `setup --environment-id <sandbox>`.
 > In `linkedEntry` mode the SEO entry must already exist. The tool updates it but never creates it.
 
 ---
 
 ## Common recipes
+
+**Several specific entries:**
+
+```bash
+node bin/seo-metadata-skill.js fetch --slug first-slug second-slug third-slug
+```
 
 **Fill every entry that has no metadata, in chunks of 20:**
 
@@ -347,7 +370,7 @@ node bin/seo-metadata-skill.js derive --input seo-metadata-work/generated-metada
 node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metadata.part-*.json
 ```
 
-**Include unpublished drafts** (needs `CONTENTFUL_PREVIEW_TOKEN`):
+**Include unpublished drafts** (needs a preview token, `setup --preview-token`):
 
 ```bash
 node bin/seo-metadata-skill.js fetch --series "Week in Review" --only-missing --preview
@@ -396,8 +419,8 @@ Pick exactly one mode:
 
 | Mode | Description |
 |---|---|
-| `--slug <slug>` | One entry, looked up by slug |
-| `--entry-id <id>` | One entry, looked up by Contentful ID |
+| `--slug <slugs...>` | One or more entries, looked up by slug (space- or comma-separated). Slugs that don't match are reported and skipped |
+| `--entry-id <ids...>` | One or more entries, looked up by Contentful ID (space- or comma-separated) |
 | `--series <value>` | All entries whose `fields.series` equals the value |
 | `--all` | All entries of the content type |
 | `--hub-slug <slug>` | One hub/landing entry |
@@ -546,7 +569,7 @@ Remove the `canonicalUrl` or `schema` block to turn that field off entirely.
 | Message | Fix |
 |---|---|
 | `Config file not found` | Copy a config to `./seo-metadata.config.json`, or pass `--config`. |
-| `Missing required env var CONTENTFUL_…` | Fill in `.env`. `--preview` needs `CONTENTFUL_PREVIEW_TOKEN`; `apply` needs `CONTENTFUL_MANAGEMENT_TOKEN`. |
+| `Missing Contentful …` | Run the `setup` command shown in the error, or run `setup` in a terminal and it asks for the value. `--preview` needs a preview token; `apply --write` needs a management token. |
 | `Cannot query field "…Collection"` | `contentful.contentType` is wrong. Use the content type **ID** from Contentful. |
 | `Cannot query field "x" on type "Article"` | A field in `fields.select` doesn't exist on that content type. |
 | `No matching entries found.` | Wrong slug or environment (Payden uses `marketing-v2`), or the entry is a draft: add `--preview`. |

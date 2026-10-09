@@ -1,4 +1,3 @@
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { graphql } = require('../lib/contentful-client');
@@ -63,6 +62,28 @@ async function fetchHub(cfg, slug, ctx) {
   const query = buildEntryByFieldQuery(cfg.hubContentType, cfg.hubFields.slug || cfg.fields.slug, cfg.hubFields.select);
   const data = await graphql(query, { value: slug, ...ctx.vars }, ctx.gqlOpts);
   return data[collectionFieldName(cfg.hubContentType)].items;
+}
+
+function toList(value) {
+  return (Array.isArray(value) ? value : [value]).flatMap((v) => String(v).split(',')).map((v) => v.trim()).filter(Boolean);
+}
+
+// Fetches each slug/ID in turn, dropping duplicates by sys.id. A value that
+// matches nothing is reported but doesn't fail the rest of the batch.
+async function fetchMany(values, fetchOne) {
+  const items = [];
+  const seen = new Set();
+  for (const value of values) {
+    const found = await fetchOne(value);
+    if (!found.length) console.error(`Not found: ${value}`);
+    for (const item of found) {
+      const id = item.sys && item.sys.id;
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      items.push(item);
+    }
+  }
+  return items;
 }
 
 function filterMissing(items, cfg) {
@@ -135,9 +156,9 @@ async function run(opts) {
 
   let items;
   if (opts.slug) {
-    items = await fetchBySlug(cfg, opts.slug, ctx);
+    items = await fetchMany(toList(opts.slug), (slug) => fetchBySlug(cfg, slug, ctx));
   } else if (opts.entryId) {
-    items = await fetchById(cfg, opts.entryId, ctx);
+    items = await fetchMany(toList(opts.entryId), (id) => fetchById(cfg, id, ctx));
   } else if (opts.hubSlug) {
     items = await fetchHub(cfg, opts.hubSlug, ctx);
   } else if (opts.series) {

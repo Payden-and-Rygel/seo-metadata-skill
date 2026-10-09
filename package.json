@@ -12,8 +12,7 @@
     "scripts",
     "lib",
     "references",
-    "SKILL.md",
-    ".env.example"
+    "SKILL.md"
   ],
   "scripts": {
     "test": "node --test"
@@ -23,7 +22,6 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "dotenv": "^16.4.5",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

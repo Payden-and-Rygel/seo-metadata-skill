@@ -14,10 +14,11 @@ This skill's scripts do the mechanical *fetching* and *exporting*. **You (Claude
 ```
 cd seo-metadata-skill
 npm install
-cp .env.example .env                                # fill in CONTENTFUL_SPACE_ID / CONTENTFUL_ACCESS_TOKEN
 cp config.example.json ./seo-metadata.config.json    # describe this project's Contentful schema
 mkdir -p rules && cp rules/*.template.md ./rules/    # then rename, dropping .template, and fill in
 ```
+
+Contentful credentials are **not** read from a `.env` file. They're saved once per user by `setup` in `~/.config/seo-metadata-skill/credentials.json` (file mode 600, outside every project) and reused on every run. You can override that path with `SEO_METADATA_CREDENTIALS`. A real environment variable such as `CONTENTFUL_ACCESS_TOKEN` (e.g. in CI) takes precedence over the stored value.
 
 If a config for this exact project already exists under `examples/` (check there first), copy that instead of starting from the blank template — see `examples/payden-and-rygel/` for what a filled-in example looks like.
 
@@ -34,15 +35,69 @@ Optional:
 - `schema.template` — a JSON-LD template. `{path}` reads the fetched entry, `{row.x}` the drafted row, `{canonicalUrl}` the derived URL; filters `|date`, `|join`. Empty values are dropped. Used by `derive`.
 - `rules.subtitleSpec` / `rules.subtitleMaxLength` — only if the project has a Subtitle field.
 
-`CONTENTFUL_MANAGEMENT_TOKEN` is only needed for the optional `apply --write` step. `CONTENTFUL_PREVIEW_TOKEN` is only needed for `fetch --preview`.
+The management token is only needed for the optional `apply --write` step. The preview token is only needed for `fetch --preview`.
+
+## Start here (every run)
+
+Make the run interactive: check setup, then ask the user what they want to do with your question picker (multiple-choice; "Other" is always available) rather than assuming. Ask only for the inputs the chosen action needs.
+
+### Step 0 — Credentials and config check
+
+Run this first. If everything is already set, say nothing and go to step 0.5.
+
+1. If `node_modules/` is missing, run `npm install`.
+2. Run `node bin/seo-metadata-skill.js setup < /dev/null`. It prints which credentials are stored, with tokens masked, and exits 1 if the space ID or access token is missing. Never read the credentials file directly.
+3. If anything required is missing, ask the user for it. Don't continue without it:
+   - **Space ID** (Contentful → Settings → General settings)
+   - **Content Delivery API access token** (Contentful → Settings → API keys)
+   - **Environment ID**, only if it isn't `master`
+   - **Preview token** (optional, only needed to generate for unpublished drafts)
+
+   Save what they give you: `node bin/seo-metadata-skill.js setup --space-id <id> --access-token <token> [--environment-id <id>] [--preview-token <token>]`. It's saved once, and later runs, in any project, reuse it without asking. Never repeat token values in your replies.
+
+   Alternatively the user can run `node bin/seo-metadata-skill.js setup` in their own terminal. It asks for anything missing (tokens aren't echoed), so the token never appears in the chat.
+4. Use the same pattern whenever a command fails with `Missing Contentful …`: ask the user for that one value, save it with the `setup` flag the error names, and re-run the command.
+5. Don't ask for the management token here. Ask for it only at the apply step, after the user has approved a write, and save it with `setup --management-token <token>`.
+6. Check the config: if `seo-metadata.config.json` is missing, ask whether to use a ready-made config from `examples/` (list the folders there) or start from the blank template (see Setup above).
+7. Check the credentials with a read-only fetch: `node bin/seo-metadata-skill.js fetch --all --limit 1 --out-file setup-check.json`. If it fails with an auth or "not found" error, tell the user which value looks wrong (token vs space/environment), ask for it again, and save the new value with `setup`. To start over, run `setup --clear`.
+
+### Step 0.5 — Ask what the user wants to do
+
+**Q1, "What would you like to do?"**
+
+| Option | Then |
+|---|---|
+| Generate SEO metadata | Ask Q2, then run Workflow steps 1–4 |
+| Re-export existing drafts | Workflow step 4 on the existing `seo-metadata-work/generated-metadata*.json` |
+| Apply reviewed metadata to Contentful | Workflow step 5. Dry run first; never write without approval |
+| Check / update setup | Repeat step 0 and let the user change any value |
+
+**Q2, "Which entries?"** (only for Generate). Ask it in the same picker call as Q3.
+
+| Option | Ask for | Command |
+|---|---|---|
+| Single entry | slug or entry ID | `fetch --slug <slug>` / `fetch --entry-id <id>` |
+| Multiple entries | a list of slugs or entry IDs | `fetch --slug a b c` / `fetch --entry-id x y z` |
+| All entries missing metadata | optional max count | `fetch --all --only-missing [--limit n]` |
+| A series or hub page | series value or hub slug | `fetch --series <v>` / `fetch --hub-slug <slug>` |
+
+Only offer the series/hub option if the config sets `contentful.fields.series` or `contentful.hubContentType`. Name whichever one(s) are actually available.
+
+**Q3, run options** (same picker call as Q2):
+- Include unpublished drafts? Adds `--preview`. If no preview token is stored, ask for one and save it with `setup --preview-token`.
+- Export format: Excel, JSON, or both. This becomes `export --format`.
+
+When the fetch returns more than 20 entries, re-run it with `--chunk-size 20` and work chunk by chunk.
+
+After export, show a short summary (rows, flagged rows, export path). Then ask: **"Stop here for review"** or **"Do an apply dry run"**. Apply always follows the approval rule in step 5.
 
 ## Workflow
 
 ### 1. Fetch entries
 
 ```
-node bin/seo-metadata-skill.js fetch --slug <slug>
-node bin/seo-metadata-skill.js fetch --entry-id <id>
+node bin/seo-metadata-skill.js fetch --slug <slug> [<slug> ...]
+node bin/seo-metadata-skill.js fetch --entry-id <id> [<id> ...]
 node bin/seo-metadata-skill.js fetch --series <value>       # requires contentful.fields.series in config
 node bin/seo-metadata-skill.js fetch --all --only-missing
 node bin/seo-metadata-skill.js fetch --hub-slug <slug>       # requires contentful.hubContentType in config
@@ -126,6 +181,7 @@ Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. W
 
 ## Hard rules (do not skip)
 
+- **Never print, repeat, or commit credential values** (access, preview, or management tokens). Store them only via `setup`; never write them to a file in the project.
 - **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` needs fresh approval. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
 - **Fail closed on missing/unreachable source content** — never fabricate a value the rule docs ask for. Flag it.
 - Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic.

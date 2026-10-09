@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { managementRequest } = require('../lib/contentful-client');
 const { loadRows } = require('./export-metadata');
 const { loadConfig, resolveLocale } = require('../lib/config');
