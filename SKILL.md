@@ -107,18 +107,26 @@ node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metada
 
 ### 5. (Optional) Apply back to Contentful
 
-Only after a human has reviewed the export. Defaults to a dry run:
+**Never write to Contentful without the user's explicit approval** (see Hard rules). Steps 1–4 are read-only; this is the only step that changes Contentful.
 
-```
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write --publish
-```
+1. Run the dry run and show the user exactly which entries, fields and locale would change:
+   ```
+   node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json
+   ```
+2. Ask the user to approve that specific write. Stop and wait — do not proceed without a clear "yes".
+3. Only after approval, run the write with `--approved`:
+   ```
+   node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write --approved
+   ```
+   Add `--publish` only if the user separately and explicitly approved publishing.
+
+Without `--approved`, `--write`/`--publish` prompts for a typed `yes` in an interactive terminal and refuses outright in a non-interactive shell. The planned changes are always printed before anything is written.
 
 Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. Writes every field that is both mapped in `contentful.seoMetadata` and present on the row (`--locale` picks the locale). Updates the entry in place (draft only, unless `--publish` is also passed). In `linkedEntry` mode it updates the linked SEO entry (never creates a new one — create it in Contentful first if missing); in `inline` mode it updates the fields directly on the main entry.
 
 ## Hard rules (do not skip)
 
+- **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` needs fresh approval. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
 - **Fail closed on missing/unreachable source content** — never fabricate a value the rule docs ask for. Flag it.
 - Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic.
 - **Never hand-write a Canonical URL or Schema** — they come from `derive` so they match the site's routing. If `derive` flags a row, surface it; don't patch the value by hand.

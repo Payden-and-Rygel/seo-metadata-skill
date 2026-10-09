@@ -75,6 +75,7 @@ program
   .option('--locale <code>', 'Contentful locale to write (default: config contentful.locale, then CONTENTFUL_LOCALE, then en-US)')
   .option('--write', 'actually write to Contentful (default is dry run)')
   .option('--publish', 'also publish the updated entry (implies --write)')
+  .option('--approved', 'confirm the user explicitly approved this write; required for --write/--publish in non-interactive shells')
   .action(async (opts) => {
     try {
       await require('../scripts/apply-metadata').run({ ...opts, write: opts.write || opts.publish });

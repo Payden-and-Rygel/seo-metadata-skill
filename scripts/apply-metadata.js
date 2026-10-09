@@ -121,12 +121,46 @@ async function run(opts) {
   const locale = resolveLocale(opts.locale, config) || DEFAULT_LOCALE;
 
   const rows = loadRows(opts.input, config.rules || {});
+
+  // Always show the planned changes first, even when --write is passed.
   for (const row of rows) {
-    await applyRow(row, seoCfg, { write: !!opts.write, publish: !!opts.publish, locale });
+    await applyRow(row, seoCfg, { write: false, publish: false, locale });
   }
   if (!opts.write) {
-    console.error('\nDry run only — no changes were made. Re-run with --write to apply.');
+    console.error('\nDry run only — no changes were made. Re-run with --write to apply (requires user approval).');
+    return;
   }
+
+  if (!(await confirmWrite(rows.length, locale, !!opts.publish, !!opts.approved))) {
+    console.error('\nAborted — no changes were made to Contentful.');
+    return;
+  }
+
+  for (const row of rows) {
+    await applyRow(row, seoCfg, { write: true, publish: !!opts.publish, locale });
+  }
+}
+
+// Nothing is ever written to Contentful without explicit user approval: either
+// --approved (passed only after the user approved this exact run) or an
+// interactive "yes". Non-interactive shells without --approved are refused.
+async function confirmWrite(count, locale, publish, approved) {
+  if (approved) return true;
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      'Refusing to write to Contentful without approval: re-run with --approved only after the user has explicitly approved this change.'
+    );
+  }
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  const answer = await new Promise((resolve) => {
+    rl.question(
+      `\nAbout to write ${count} entr${count === 1 ? 'y' : 'ies'} to Contentful (locale ${locale})${publish ? ' and PUBLISH them' : ''}. Type 'yes' to continue: `,
+      resolve
+    );
+  });
+  rl.close();
+  return answer.trim() === 'yes';
 }
 
 module.exports = { run, fieldValues };

@@ -173,10 +173,10 @@ Claude: (runs) apply --input generated-metadata.part-*.json
         [dry run] would update linked "seoMetadata" entry 5Xk… for "pov-2025-vol-04-…" (en-US):
                   title, description, keywords, canonicalUrl, richResultSchema
         ...
-        Dry run only — no changes were made. Re-run with --write to apply.
+        Dry run only — no changes were made. Re-run with --write to apply (requires user approval).
 ```
 
-Claude never writes to Contentful unless you ask, and it always does a dry run first. Rows it can't fill confidently are **flagged, not guessed**. Look at the `flags` column in the spreadsheet.
+Claude **never** writes to Contentful without your explicit approval: it always does a dry run first, shows you what would change, and waits for a clear yes for that specific run (publishing needs its own yes). Rows it can't fill confidently are **flagged, not guessed**. Look at the `flags` column in the spreadsheet.
 
 ---
 
@@ -312,14 +312,16 @@ node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadat
 ```
 [dry run] would update linked "seoMetadata" entry 3hF… for "pov-2025-vol-02-drone-delivery" (en-US): title, description, keywords, canonicalUrl, richResultSchema
 
-Dry run only — no changes were made. Re-run with --write to apply.
+Dry run only — no changes were made. Re-run with --write to apply (requires user approval).
 ```
 
-Then write the changes. They are saved as drafts, so nothing goes live yet:
+Then write the changes. They are saved as drafts, so nothing goes live yet. The planned changes are printed again, and you must type `yes` to continue:
 
 ```bash
 node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write
 ```
+
+In a non-interactive shell (e.g. when Claude runs it) `--write` is refused unless `--approved` is also passed. Claude only adds `--approved` after you have explicitly approved that write.
 
 Check the entries in the Contentful web app. Publish them there, or re-run with `--publish`:
 
@@ -436,6 +438,7 @@ Options:
 | `--input <files...>` | Rows to apply; each row must have `entryId` (required) |
 | `--write` | Actually write the changes (without it, this is a dry run) |
 | `--publish` | Also publish the updated entry (implies `--write`) |
+| `--approved` | Skip the interactive `yes` prompt; required for `--write`/`--publish` in non-interactive shells. Pass only after the user approved this write. |
 | `--locale <code>` | Locale to write (default `en-US`) |
 
 ### Row format (`generated-metadata.json`)
