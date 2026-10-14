@@ -31,7 +31,10 @@
       "missingCheckFields": [
         "title",
         "description"
-      ]
+      ],
+      "_createComment": "Used only by `apply --create-missing` (linkedEntry mode), which creates a new SEO entry when a page has none and links it. createDefaults sets extra fields on new entries only (e.g. a required indexing flag). contentType is the SEO entry's content type ID; leave null to use the one the page's link field accepts.",
+      "createDefaults": {},
+      "contentType": null
     },
     "locale": null
   },

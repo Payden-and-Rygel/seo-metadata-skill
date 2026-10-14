@@ -104,6 +104,7 @@ program
   .option('--config <path>', 'path to your seo-metadata.config.json (default: ./seo-metadata.config.json)')
   .option('--locale <code>', 'Contentful locale to write (default: config contentful.locale, then CONTENTFUL_LOCALE, then en-US)')
   .option('--write', 'actually write to Contentful (default is dry run)')
+  .option('--create-missing', 'create and link a new SEO metadata entry when an entry has none (linkedEntry mode)')
   .option('--publish', 'also publish the updated entry (implies --write)')
   .option('--approved', 'confirm the user explicitly approved this write; required for --write/--publish in non-interactive shells')
   .action(async (opts) => {

@@ -396,7 +396,7 @@ node scripts/cli.js apply --input seo-metadata-work/generated-metadata.json --wr
 ```
 
 > Try `--write` against a sandbox environment first: `setup --environment-id <sandbox>`.
-> In `linkedEntry` mode the SEO entry must already exist. The tool updates it but never creates it.
+> In `linkedEntry` mode, a page with no SEO entry makes `apply` fail, unless you pass `--create-missing`. With that flag it creates a new SEO entry (using `createDefaults` from the config for fields such as `enableSearchEngineIndexing`) and links it to the page. Both stay as drafts unless you also pass `--publish`.
 
 ---
 
@@ -509,7 +509,8 @@ Options:
 |---|---|
 | `--input <files...>` | Rows to apply; each row must have `entryId` (required) |
 | `--write` | Actually write the changes (without it, this is a dry run) |
-| `--publish` | Also publish the updated entry (implies `--write`) |
+| `--create-missing` | In `linkedEntry` mode, when an entry has no linked SEO entry, create one (with `createDefaults` + the row's fields) and link it to the page. Without this flag, such rows fail. |
+| `--publish` | Also publish the updated entry (implies `--write`). With `--create-missing`, the new SEO entry is published and the page is republished only if it had no other unpublished edits. |
 | `--approved` | Skip the interactive `yes` prompt; required for `--write`/`--publish` in non-interactive shells. Pass only after the user approved this write. |
 | `--locale <code>` | Locale to write (default `en-US`) |
 
@@ -560,7 +561,12 @@ Options:
       "subtitleField": null,               // set only if the field exists
       "canonicalUrlField": "canonicalUrl", // omit to never write it
       "schemaField": "richResultSchema",   // omit to never write it
-      "missingCheckFields": ["title", "description"]   // what --only-missing checks
+      "missingCheckFields": ["title", "description"],  // what --only-missing checks
+      "createDefaults": {                  // only for apply --create-missing: extra fields on new SEO entries
+        "enableSearchEngineIndexing": true,
+        "priority": "1.0"
+      },
+      "contentType": null                  // SEO entry content type ID; null = what the link field accepts
     }
   },
 
@@ -627,7 +633,8 @@ Remove the `canonicalUrl` or `schema` block to turn that field off entirely.
 | `Cannot query field "…Collection"` | `contentful.contentType` is wrong. Use the content type **ID** from Contentful. |
 | `Cannot query field "x" on type "Article"` | A field in `fields.select` doesn't exist on that content type. |
 | `No matching entries found.` | Wrong slug or environment (Payden uses `marketing-v2`), or the entry is a draft: add `--preview`. |
-| `has no linked "seoMetadata" entry yet` | Create the SEO metadata entry in Contentful first. `apply` only updates existing entries. |
+| `has no linked "seoMetadata" entry yet` | Re-run `apply` with `--create-missing` to create and link one (dry run first). |
+| `Created "seoMetadata" entry … but failed to link it` | The SEO entry exists but isn't linked, often because someone edited the page at the same moment. Link it by hand in Contentful, or delete it and re-run. |
 | `title exceeds N chars` | The draft is over the cap. Shorten it (or ask Claude to), then export again. |
 | `derive: canonical URL pattern … has empty token(s): slug` | The entry is missing a field the URL needs. Fill it in Contentful, or set the URL by hand after review. |
 | `Duplicate entryId` | The same entry appears in two input files. Remove one. |

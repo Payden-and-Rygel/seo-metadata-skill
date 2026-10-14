@@ -42,7 +42,7 @@ If a config for this exact project already exists under `${CLAUDE_SKILL_DIR}/exa
 - `contentful.contentType` — the Contentful content type ID to query.
 - `contentful.fields.slug` — the field used to look up an entry by slug.
 - `contentful.fields.select` — the GraphQL field selections to fetch (raw snippets, e.g. `"hero { image { url } }"`).
-- `contentful.seoMetadata` — how the SEO fields are stored (a linked entry, or inline on the entry itself) and their field names, required for `apply`. Optional `subtitleField`, `canonicalUrlField`, `schemaField`: a field is only written when it's mapped here.
+- `contentful.seoMetadata` — how the SEO fields are stored (a linked entry, or inline on the entry itself) and their field names, required for `apply`. Optional `subtitleField`, `canonicalUrlField`, `schemaField`: a field is only written when it's mapped here. Optional `createDefaults` (extra field values set only on SEO entries created by `apply --create-missing`, e.g. a required indexing flag) and `contentType` (the SEO entry's content type ID; by default, the one the page's link field accepts).
 
 Optional:
 - `contentful.fields.richText` — dot-paths of rich-text fields (e.g. `"content.json"`) to flatten into plain text under `_plainText` on fetch; `plainTextMaxChars` caps the length.
@@ -184,21 +184,24 @@ node "${CLAUDE_SKILL_DIR}/scripts/cli.js" export --input seo-metadata-work/gener
    ```
    node "${CLAUDE_SKILL_DIR}/scripts/cli.js" apply --input seo-metadata-work/generated-metadata.json
    ```
+   If the dry run fails with `has no linked "…" entry yet` (linkedEntry mode), those pages/articles have no SEO entry. Tell the user which ones, and ask whether to create and link new SEO entries for them. If yes, re-run the dry run with `--create-missing` and show its plan: for each such page it lists `would CREATE … and LINK it to …`, the fields set (including the config's `createDefaults`), and what happens to the page.
 2. Ask the user to approve that specific write. Stop and wait — do not proceed without a clear "yes".
 3. Only after approval, run the write with `--approved`:
    ```
-   node "${CLAUDE_SKILL_DIR}/scripts/cli.js" apply --input seo-metadata-work/generated-metadata.json --write --approved
+   node "${CLAUDE_SKILL_DIR}/scripts/cli.js" apply --input seo-metadata-work/generated-metadata.json --write --approved [--create-missing]
    ```
-   Add `--publish` only if the user separately and explicitly approved publishing.
+   Keep `--create-missing` only if it was in the approved dry run. Add `--publish` only if the user separately and explicitly approved publishing.
+
+   Creating a missing SEO entry also edits the page/article, because its link field changes. Without `--publish`, the new SEO entry and the page change both stay as drafts for editors to review and publish. With `--publish`, the new SEO entry is published, and the page is republished only if it had no other unpublished edits. Otherwise it's left as a draft and reported, so tell the user it needs publishing in Contentful.
 
 Without `--approved`, `--write`/`--publish` prompts for a typed `yes` in an interactive terminal and refuses outright in a non-interactive shell. The planned changes are always printed before anything is written.
 
-Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. Writes every field that is both mapped in `contentful.seoMetadata` and present on the row (`--locale` picks the locale). Updates the entry in place (draft only, unless `--publish` is also passed). In `linkedEntry` mode it updates the linked SEO entry (never creates a new one — create it in Contentful first if missing); in `inline` mode it updates the fields directly on the main entry.
+Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. Writes every field that is both mapped in `contentful.seoMetadata` and present on the row (`--locale` picks the locale). Updates the entry in place (draft only, unless `--publish` is also passed). In `linkedEntry` mode it updates the linked SEO entry. If there is none, it fails, unless `--create-missing` is passed: then it creates a new SEO entry and links it to the page. In `inline` mode it updates the fields directly on the main entry. Works for any entry that has the configured link field (articles and hub pages alike). Non-localized fields are always written under the space's default locale.
 
 ## Hard rules (do not skip)
 
 - **Never print, repeat, or commit credential values** (access, preview, or management tokens). Store them only via `setup`; never write them to a file in the project yourself. The one exception is the gitignored `.seo-metadata/credentials.json` that `setup --local` manages. Never read it directly either.
-- **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` needs fresh approval. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
+- **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` or `--create-missing` needs fresh approval. Creating entries and changing a page's SEO link are writes too. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
 - **Fail closed on missing/unreachable source content** — never fabricate a value the rule docs ask for. Flag it.
 - Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic.
 - **Never hand-write a Canonical URL or Schema** — they come from `derive` so they match the site's routing. If `derive` flags a row, surface it; don't patch the value by hand.
