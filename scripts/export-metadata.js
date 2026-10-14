@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('xlsx');
+// Vendored (vendor/xlsx) so the skill needs no `npm install`.
+const XLSX = require('../vendor/xlsx/xlsx.mini.min.js');
 const { loadConfig } = require('../lib/config');
 
 const REQUIRED_FIELDS = ['slug', 'title', 'description', 'keywords'];
@@ -65,7 +66,7 @@ function toExcel(rows, outFile) {
   const sheet = XLSX.utils.json_to_sheet(sheetRows);
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, 'Metadata');
-  XLSX.writeFile(book, outFile);
+  fs.writeFileSync(outFile, XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }));
 }
 
 function run(opts) {

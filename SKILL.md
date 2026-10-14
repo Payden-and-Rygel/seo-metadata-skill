@@ -9,18 +9,34 @@ Generates the SEO metadata fields for Contentful entries: Title, Description, Ke
 
 This skill's scripts do the mechanical *fetching* and *exporting*. **You (Claude) do the actual drafting** by reading the fetched content and applying the project's rule docs — this is judgment work, not a template fill-in a script could do reliably.
 
+## Running the scripts (Claude Code and Cowork)
+
+This skill works the same in Claude Code and in Cowork (Claude desktop).
+
+- `${CLAUDE_SKILL_DIR}` in the commands below is this skill's own directory and is normally filled in automatically. If it still appears literally, replace it with the skill's base directory (shown when the skill loaded). Keep the path quoted.
+- Run every command from the **user's working folder**, not from the skill directory: the project folder in Claude Code, or the folder the user selected in Cowork. `seo-metadata.config.json`, `rules/` and the output folder `seo-metadata-work/` all live there. In Cowork, the skill directory is read-only.
+- **No `npm install` is needed.** The only dependencies are vendored under `${CLAUDE_SKILL_DIR}/vendor/`. Never run `npm install` for this skill; if a command fails with `Cannot find module`, the skill copy is incomplete, so tell the user to reinstall it.
+- The only requirement is Node.js 18 or newer (see step 0).
+
+### Running in Cowork
+
+- The skill is installed by uploading `dist/seo-metadata.zip` from the GitHub repo. To update it, the user downloads the latest zip and uploads it again.
+- Cowork's sandbox does not keep the home folder between sessions, so save credentials with `setup --local`. They go to `.seo-metadata/credentials.json` in the selected folder (file mode 600, with its own `.gitignore`), and later sessions in the same folder find them automatically.
+- Contentful must be reachable from the sandbox. If `fetch` or `apply` fails with `fetch failed`, `ENOTFOUND`, or a network/egress error, tell the user to allow `graphql.contentful.com` (fetch) and `api.contentful.com` (apply) in Claude's network egress settings (Settings → Capabilities, or their org admin), then retry.
+- Tell the user that exports are in `seo-metadata-work/` in their selected folder.
+
 ## Setup (one-time, per project)
 
+From the working folder:
+
 ```
-cd seo-metadata-skill
-npm install
-cp config.example.json ./seo-metadata.config.json    # describe this project's Contentful schema
-mkdir -p rules && cp rules/*.template.md ./rules/    # then rename, dropping .template, and fill in
+cp "${CLAUDE_SKILL_DIR}/config.example.json" ./seo-metadata.config.json    # describe this project's Contentful schema
+mkdir -p rules && cp "${CLAUDE_SKILL_DIR}"/rules/*.template.md ./rules/      # then rename, dropping .template, and fill in
 ```
 
-Contentful credentials are **not** read from a `.env` file. They're saved once per user by `setup` in `~/.config/seo-metadata-skill/credentials.json` (file mode 600, outside every project) and reused on every run. You can override that path with `SEO_METADATA_CREDENTIALS`. A real environment variable such as `CONTENTFUL_ACCESS_TOKEN` (e.g. in CI) takes precedence over the stored value.
+Contentful credentials are **not** read from a `.env` file. They're saved once per user by `setup` in `~/.config/seo-metadata-skill/credentials.json` (file mode 600, outside every project) and reused on every run. In Cowork use `setup --local` instead (see above); when `./.seo-metadata/credentials.json` exists in the working folder, it is used instead of the per-user file. You can override the path with `SEO_METADATA_CREDENTIALS`. A real environment variable such as `CONTENTFUL_ACCESS_TOKEN` (e.g. in CI) takes precedence over the stored value.
 
-If a config for this exact project already exists under `examples/` (check there first), copy that instead of starting from the blank template — see `examples/payden-and-rygel/` for what a filled-in example looks like.
+If a config for this exact project already exists under `${CLAUDE_SKILL_DIR}/examples/` (check there first), copy that instead of starting from the blank template — see `examples/payden-and-rygel/` for what a filled-in example looks like.
 
 `seo-metadata.config.json` must define, at minimum:
 - `contentful.contentType` — the Contentful content type ID to query.
@@ -45,21 +61,21 @@ Make the run interactive: check setup, then ask the user what they want to do wi
 
 Run this first. If everything is already set, say nothing and go to step 0.5.
 
-1. If `node_modules/` is missing, run `npm install`.
-2. Run `node bin/seo-metadata-skill.js setup < /dev/null`. It prints which credentials are stored, with tokens masked, and exits 1 if the space ID or access token is missing. Never read the credentials file directly.
+1. Run `node --version`. If `node` is not found or the version is below 18, stop and help the user install Node.js LTS. On macOS use the installer from https://nodejs.org or `brew install node`. On Windows use the installer from https://nodejs.org or `winget install OpenJS.NodeJS.LTS`. On Linux use the distro package or nvm. Ask them to restart the terminal or app afterwards, then re-check. Do not run `npm install`; nothing needs installing besides Node.
+2. Run `node "${CLAUDE_SKILL_DIR}/scripts/cli.js" setup < /dev/null`. It prints which credentials are stored, with tokens masked, and exits 1 if the space ID or access token is missing. Never read the credentials file directly.
 3. If anything required is missing, ask the user for it. Don't continue without it:
    - **Space ID** (Contentful → Settings → General settings)
    - **Content Delivery API access token** (Contentful → Settings → API keys)
    - **Environment ID**, only if it isn't `master`
    - **Preview token** (optional, only needed to generate for unpublished drafts)
 
-   Save what they give you: `node bin/seo-metadata-skill.js setup --space-id <id> --access-token <token> [--environment-id <id>] [--preview-token <token>]`. It's saved once, and later runs, in any project, reuse it without asking. Never repeat token values in your replies.
+   Save what they give you: `node "${CLAUDE_SKILL_DIR}/scripts/cli.js" setup --space-id <id> --access-token <token> [--environment-id <id>] [--preview-token <token>]`. In Cowork, add `--local`. It's saved once, and later runs reuse it without asking (in Claude Code, from any project; in Cowork, from the same folder). Never repeat token values in your replies.
 
-   Alternatively the user can run `node bin/seo-metadata-skill.js setup` in their own terminal. It asks for anything missing (tokens aren't echoed), so the token never appears in the chat.
+   Alternatively the user can run `node "${CLAUDE_SKILL_DIR}/scripts/cli.js" setup` in their own terminal. It asks for anything missing (tokens aren't echoed), so the token never appears in the chat.
 4. Use the same pattern whenever a command fails with `Missing Contentful …`: ask the user for that one value, save it with the `setup` flag the error names, and re-run the command.
 5. Don't ask for the management token here. Ask for it only at the apply step, after the user has approved a write, and save it with `setup --management-token <token>`.
-6. Check the config: if `seo-metadata.config.json` is missing, ask whether to use a ready-made config from `examples/` (list the folders there) or start from the blank template (see Setup above).
-7. Check the credentials with a read-only fetch: `node bin/seo-metadata-skill.js fetch --all --limit 1 --out-file setup-check.json`. If it fails with an auth or "not found" error, tell the user which value looks wrong (token vs space/environment), ask for it again, and save the new value with `setup`. To start over, run `setup --clear`.
+6. Check the config: if `seo-metadata.config.json` is missing, ask whether to use a ready-made config from `${CLAUDE_SKILL_DIR}/examples/` (list the folders there; copy its `config.json` to `./seo-metadata.config.json` and its `rules/` and `reference-data.json` alongside) or start from the blank template (see Setup above).
+7. Check the credentials with a read-only fetch: `node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --all --limit 1 --out-file setup-check.json`. If it fails with an auth or "not found" error, tell the user which value looks wrong (token vs space/environment), ask for it again, and save the new value with `setup`. To start over, run `setup --clear`.
 
 ### Step 0.5 — Ask what the user wants to do
 
@@ -96,11 +112,11 @@ After export, show a short summary (rows, flagged rows, export path). Then ask: 
 ### 1. Fetch entries
 
 ```
-node bin/seo-metadata-skill.js fetch --slug <slug> [<slug> ...]
-node bin/seo-metadata-skill.js fetch --entry-id <id> [<id> ...]
-node bin/seo-metadata-skill.js fetch --series <value>       # requires contentful.fields.series in config
-node bin/seo-metadata-skill.js fetch --all --only-missing
-node bin/seo-metadata-skill.js fetch --hub-slug <slug>       # requires contentful.hubContentType in config
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --slug <slug> [<slug> ...]
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --entry-id <id> [<id> ...]
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --series <value>       # requires contentful.fields.series in config
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --all --only-missing
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" fetch --hub-slug <slug>       # requires contentful.hubContentType in config
 ```
 
 Options:
@@ -145,7 +161,7 @@ Save it, e.g. to `seo-metadata-work/generated-metadata.json`. Do **not** write `
 ### 3. Derive Canonical URL and Schema
 
 ```
-node bin/seo-metadata-skill.js derive --input seo-metadata-work/generated-metadata.json --fetched seo-metadata-work/fetched-entries.json
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" derive --input seo-metadata-work/generated-metadata.json --fetched seo-metadata-work/fetched-entries.json
 ```
 
 Both flags take several files (e.g. all the part files). Fills in `canonicalUrl` and `schema` on each row in place, from the config's `canonicalUrl` / `schema` templates and the fetched entry data. Rows that already have a value keep it unless `--force` is passed. A row whose URL can't be built (missing slug, no matching rule, no fetched entry) gets a `derive:` entry in `flags` instead of a guessed value — report those to the user.
@@ -155,7 +171,7 @@ Skip this step if the config has neither `canonicalUrl` nor `schema`.
 ### 4. Export for review
 
 ```
-node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metadata.json --format both
+node "${CLAUDE_SKILL_DIR}/scripts/cli.js" export --input seo-metadata-work/generated-metadata.json --format both
 ```
 
 `--input` accepts several files. If `--config` is given (or the default config file exists), validates against `rules.titleMaxLength` / `rules.descriptionMaxLength` / `rules.subtitleMaxLength` when set, and checks that `canonicalUrl` is absolute and `schema` is an object. Writes `seo-metadata-work/metadata-export.json` and/or `.xlsx`.
@@ -166,12 +182,12 @@ node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metada
 
 1. Run the dry run and show the user exactly which entries, fields and locale would change:
    ```
-   node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json
+   node "${CLAUDE_SKILL_DIR}/scripts/cli.js" apply --input seo-metadata-work/generated-metadata.json
    ```
 2. Ask the user to approve that specific write. Stop and wait — do not proceed without a clear "yes".
 3. Only after approval, run the write with `--approved`:
    ```
-   node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write --approved
+   node "${CLAUDE_SKILL_DIR}/scripts/cli.js" apply --input seo-metadata-work/generated-metadata.json --write --approved
    ```
    Add `--publish` only if the user separately and explicitly approved publishing.
 
@@ -181,7 +197,7 @@ Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. W
 
 ## Hard rules (do not skip)
 
-- **Never print, repeat, or commit credential values** (access, preview, or management tokens). Store them only via `setup`; never write them to a file in the project.
+- **Never print, repeat, or commit credential values** (access, preview, or management tokens). Store them only via `setup`; never write them to a file in the project yourself. The one exception is the gitignored `.seo-metadata/credentials.json` that `setup --local` manages. Never read it directly either.
 - **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` needs fresh approval. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
 - **Fail closed on missing/unreachable source content** — never fabricate a value the rule docs ask for. Flag it.
 - Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic.
@@ -192,6 +208,9 @@ Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. W
 
 ## Files
 
+All paths are relative to `${CLAUDE_SKILL_DIR}`.
+
+- `vendor/` — the bundled dependencies (commander, SheetJS xlsx), so no `npm install` is needed.
 - `config.example.json` — the config schema, with placeholders. Copy and fill in per project.
 - `rules/*.template.md` — generic templates showing the shape a rule doc needs; not usable as-is. `subtitle-spec.template.md` is only needed if the project has a Subtitle field.
-- `examples/payden-and-rygel/` — a fully filled-in worked example (config + rules + reference data + the original source PDFs), for that specific project.
+- `examples/payden-and-rygel/` — a fully filled-in worked example (config + rules + reference data, plus the original source PDFs in the git repo), for that specific project.

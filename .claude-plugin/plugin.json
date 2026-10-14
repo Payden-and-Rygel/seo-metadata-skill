@@ -1,0 +1,7 @@
+{
+  "name": "seo-metadata",
+  "description": "Generate SEO metadata (Title, Description, Keywords, Canonical URL, Schema) for Contentful entries from a project config and rule docs, export to Excel/JSON for review, and apply back to Contentful.",
+  "author": { "name": "Payden & Rygel" },
+  "repository": "https://github.com/Payden-and-Rygel/seo-metadata-skill",
+  "license": "UNLICENSED"
+}

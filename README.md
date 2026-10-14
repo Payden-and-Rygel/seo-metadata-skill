@@ -1,6 +1,6 @@
 # seo-metadata-skill
 
-A Claude Code skill that fills in the SEO metadata for Contentful entries:
+A Claude skill (Claude Code and Cowork) that fills in the SEO metadata for Contentful entries:
 
 | Field | How it's produced |
 |---|---|
@@ -52,28 +52,74 @@ Only the **draft** step involves judgment, and that's the part Claude does. Ever
 
 ## Install
 
-**Requirements:** Node.js 18+, and access to the Contentful space (API tokens).
+**Requirements:** Node.js 18+, and access to the Contentful space (API tokens). That's all: there is **no `npm install` step**. The two dependencies (commander, SheetJS xlsx) are bundled in `vendor/`.
 
-As a Claude Code skill:
+Don't have Node? Install the LTS release from [nodejs.org](https://nodejs.org), or `brew install node` (macOS), or `winget install OpenJS.NodeJS.LTS` (Windows). Check with `node --version`.
+
+The ready-to-install skill is committed to this repo as [`dist/seo-metadata.zip`](dist/seo-metadata.zip), about 200 KB. The repo is private, so you need read access to `Payden-and-Rygel/seo-metadata-skill`.
+
+### Cowork (Claude desktop)
+
+1. Download the zip from GitHub: open [`dist/seo-metadata.zip`](dist/seo-metadata.zip) and click **Download raw file**, or use https://github.com/Payden-and-Rygel/seo-metadata-skill/raw/main/dist/seo-metadata.zip while signed in.
+2. In Claude desktop, go to **Customize → Add → Upload a skill** and choose the zip. **Upload plugin** works too, since the zip includes `.claude-plugin/plugin.json`.
+3. Make sure code execution is on, and allow Claude's sandbox to reach Contentful. Add `graphql.contentful.com` (fetch) and `api.contentful.com` (apply) to the network egress allowlist under Settings → Capabilities, or ask your org admin.
+4. In a Cowork task, select the folder that holds (or will hold) your `seo-metadata.config.json` and `rules/`, and ask Claude to generate SEO metadata. Exports appear in `seo-metadata-work/` in that folder.
+
+To update, download the zip again and re-upload it, replacing the old skill.
+
+#### Prompt to paste in Cowork
+
+After uploading the skill, start a new Cowork task, select your project folder, and paste this prompt:
+
+```text
+Use the seo-metadata skill. This is a Cowork session, so:
+- Run the skill's scripts from this selected folder, and do not run npm install. Node.js 18+ is the only requirement, so check `node --version` first.
+- Save my Contentful credentials with `setup --local` so they're kept in this folder for future sessions. Ask me for any that are missing, and never repeat token values back to me.
+- If there's no seo-metadata.config.json here, ask me whether to use the Payden & Rygel example config from the skill or start from the blank template, and copy the matching rules/ and reference-data.json into this folder.
+- If Contentful can't be reached (fetch failed / ENOTFOUND), tell me to allow graphql.contentful.com and api.contentful.com in network egress settings.
+Then check setup and ask me what I'd like to do.
+```
+
+You only need the full prompt the first time in a folder. After that, a short request is enough. For example:
+
+```text
+Use the seo-metadata skill to generate SEO metadata for the article with slug <slug> and export it to Excel.
+```
+
+```text
+Use the seo-metadata skill to find all articles missing SEO metadata, draft it for up to 10, and export for review.
+```
+
+Nothing is written to Contentful unless you explicitly approve it after a dry run.
+
+### Claude Code
 
 ```bash
 npx skills add Payden-and-Rygel/seo-metadata-skill
 ```
 
-Or clone it and install its dependencies:
+Or unzip `dist/seo-metadata.zip` into `~/.claude/skills/`, which gives you `~/.claude/skills/seo-metadata/SKILL.md`.
+
+To work on the skill itself, clone the repo. There's no install step, and `npm test` runs the unit tests. The `node scripts/cli.js …` commands below assume you're running from a clone. Add `--config <path>` or run from your project folder as needed.
+
+### Updating the zip (maintainers)
+
+The zip is built from the source files, so rebuild it whenever you change the skill, and commit it along with the change:
 
 ```bash
-git clone <repo-url> seo-metadata-skill
-cd seo-metadata-skill
-npm install
-npm test          # optional: runs the unit tests
+npm run package     # rewrites dist/seo-metadata.zip
+npm test            # fails if the committed zip is out of date with the source
 ```
+
+The zip only contains the generic skill files, never a project's own config, rules or credentials.
+
+Credentials in Cowork are saved in that folder, in `.seo-metadata/credentials.json` (see [Credentials](#credentials)), because the sandbox doesn't keep your home folder between sessions.
 
 ---
 
 ## Set up a project
 
-> **Easiest:** just start using the skill in Claude Code (terminal or desktop app). On the first run Claude checks the saved credentials. If the space ID or access token is missing, Claude asks you for them and saves them once for you. Later runs, in any project, reuse them. No `.env` file is used.
+> **Easiest:** just start using the skill in Claude Code or Cowork. On the first run Claude checks the saved credentials. If the space ID or access token is missing, Claude asks you for them and saves them once for you. Later runs, in any project, reuse them. No `.env` file is used.
 
 ### Option A — Payden & Rygel (ready-made config)
 
@@ -86,14 +132,14 @@ cp examples/payden-and-rygel/reference-data.json ./rules/reference-data.json
 Save your Contentful credentials once (see [Credentials](#credentials)):
 
 ```bash
-node bin/seo-metadata-skill.js setup --environment-id marketing-v2   # payden.com does NOT use "master"
-node bin/seo-metadata-skill.js setup        # asks for the space ID and access token
+node scripts/cli.js setup --environment-id marketing-v2   # payden.com does NOT use "master"
+node scripts/cli.js setup        # asks for the space ID and access token
 ```
 
 Check the setup with a single entry:
 
 ```bash
-node bin/seo-metadata-skill.js fetch --slug pov-2025-vol-02-drone-delivery
+node scripts/cli.js fetch --slug pov-2025-vol-02-drone-delivery
 # Fetched 1 entry -> seo-metadata-work/fetched-entries.json
 ```
 
@@ -110,7 +156,7 @@ cp rules/subtitle-spec.template.md     rules/subtitle-spec.md   # only if you ha
 
 Then:
 
-1. **Save your Contentful credentials** with `node bin/seo-metadata-skill.js setup` (see [Credentials](#credentials)).
+1. **Save your Contentful credentials** with `node scripts/cli.js setup` (see [Credentials](#credentials)).
 2. **Edit `seo-metadata.config.json`.** At minimum, set the following (see the [Config reference](#config-reference)):
    - `contentful.contentType`
    - `contentful.fields.select`
@@ -124,11 +170,14 @@ Then:
 
 Credentials are saved **once per user**, outside every project, in `~/.config/seo-metadata-skill/credentials.json` (file mode 600). Nothing is read from a `.env` file.
 
+In **Cowork**, use `setup --local` instead: it saves to `.seo-metadata/credentials.json` in the current folder (file mode 600, with a `.gitignore` so it's never committed). Whenever that file exists in the folder you run from, it's used instead of the per-user file.
+
 ```bash
-node bin/seo-metadata-skill.js setup                       # show what's saved (tokens masked); in a terminal, asks for anything missing
-node bin/seo-metadata-skill.js setup --space-id <id> --access-token <token>
-node bin/seo-metadata-skill.js setup --management-token <token>   # only when you need apply --write
-node bin/seo-metadata-skill.js setup --clear               # delete everything saved
+node scripts/cli.js setup                       # show what's saved (tokens masked); in a terminal, asks for anything missing
+node scripts/cli.js setup --space-id <id> --access-token <token>
+node scripts/cli.js setup --management-token <token>   # only when you need apply --write
+node scripts/cli.js setup --local --space-id <id> --access-token <token>   # Cowork: save in ./.seo-metadata/
+node scripts/cli.js setup --clear               # delete the credentials file in use
 ```
 
 If a command needs a value that isn't saved, it asks you for it in an interactive terminal (tokens aren't echoed) and saves it. In a non-interactive shell it fails with the exact `setup` flag to use. Claude handles that by asking you in chat.
@@ -204,7 +253,7 @@ This is the same flow run by hand, using the Payden config and a real Point of V
 ### Step 1 — Fetch
 
 ```bash
-node bin/seo-metadata-skill.js fetch --slug pov-2025-vol-02-drone-delivery
+node scripts/cli.js fetch --slug pov-2025-vol-02-drone-delivery
 ```
 
 ```
@@ -266,7 +315,7 @@ The output is `seo-metadata-work/generated-metadata.json`. The values below are 
 ### Step 3 — Derive the Canonical URL and Schema
 
 ```bash
-node bin/seo-metadata-skill.js derive \
+node scripts/cli.js derive \
   --input   seo-metadata-work/generated-metadata.json \
   --fetched seo-metadata-work/fetched-entries.json
 ```
@@ -298,7 +347,7 @@ The URL matched the Point of View rule because the article is linked from the `p
 ### Step 4 — Export for review
 
 ```bash
-node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metadata.json
+node scripts/cli.js export --input seo-metadata-work/generated-metadata.json
 ```
 
 ```
@@ -323,7 +372,7 @@ Send the `.xlsx` to whoever signs off on SEO copy. If they request changes, make
 Always start with a dry run (the default):
 
 ```bash
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json
+node scripts/cli.js apply --input seo-metadata-work/generated-metadata.json
 ```
 
 ```
@@ -335,7 +384,7 @@ Dry run only — no changes were made. Re-run with --write to apply (requires us
 Then write the changes. They are saved as drafts, so nothing goes live yet. The planned changes are printed again, and you must type `yes` to continue:
 
 ```bash
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write
+node scripts/cli.js apply --input seo-metadata-work/generated-metadata.json --write
 ```
 
 In a non-interactive shell (e.g. when Claude runs it) `--write` is refused unless `--approved` is also passed. Claude only adds `--approved` after you have explicitly approved that write.
@@ -343,7 +392,7 @@ In a non-interactive shell (e.g. when Claude runs it) `--write` is refused unles
 Check the entries in the Contentful web app. Publish them there, or re-run with `--publish`:
 
 ```bash
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --write --publish
+node scripts/cli.js apply --input seo-metadata-work/generated-metadata.json --write --publish
 ```
 
 > Try `--write` against a sandbox environment first: `setup --environment-id <sandbox>`.
@@ -356,55 +405,55 @@ node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadat
 **Several specific entries:**
 
 ```bash
-node bin/seo-metadata-skill.js fetch --slug first-slug second-slug third-slug
+node scripts/cli.js fetch --slug first-slug second-slug third-slug
 ```
 
 **Fill every entry that has no metadata, in chunks of 20:**
 
 ```bash
-node bin/seo-metadata-skill.js fetch --all --only-missing --chunk-size 20
+node scripts/cli.js fetch --all --only-missing --chunk-size 20
 # -> fetched-entries.part-001.json, part-002.json, ...
 # Claude drafts generated-metadata.part-1.json, part-2.json, ... one chunk at a time
-node bin/seo-metadata-skill.js derive --input seo-metadata-work/generated-metadata.part-*.json \
+node scripts/cli.js derive --input seo-metadata-work/generated-metadata.part-*.json \
                                       --fetched seo-metadata-work/fetched-entries.part-*.json
-node bin/seo-metadata-skill.js export --input seo-metadata-work/generated-metadata.part-*.json
+node scripts/cli.js export --input seo-metadata-work/generated-metadata.part-*.json
 ```
 
 **Include unpublished drafts** (needs a preview token, `setup --preview-token`):
 
 ```bash
-node bin/seo-metadata-skill.js fetch --series "Week in Review" --only-missing --preview
+node scripts/cli.js fetch --series "Week in Review" --only-missing --preview
 ```
 
 **Just try it on a few entries first:**
 
 ```bash
-node bin/seo-metadata-skill.js fetch --all --only-missing --limit 3
+node scripts/cli.js fetch --all --only-missing --limit 3
 ```
 
 **Fix wrong canonical URLs on existing metadata** without re-drafting titles or descriptions. Put the current values in the rows, then force-recompute the derived fields:
 
 ```bash
-node bin/seo-metadata-skill.js derive --input rows.json --fetched seo-metadata-work/fetched-entries.json --force
+node scripts/cli.js derive --input rows.json --fetched seo-metadata-work/fetched-entries.json --force
 ```
 
 **A Point of View hub page** (uses `hubContentType` / `hubFields` from config):
 
 ```bash
-node bin/seo-metadata-skill.js fetch --hub-slug pov-2025-vol-02
+node scripts/cli.js fetch --hub-slug pov-2025-vol-02
 ```
 
 **Another locale:**
 
 ```bash
-node bin/seo-metadata-skill.js fetch --slug some-slug --locale fr-FR
-node bin/seo-metadata-skill.js apply --input seo-metadata-work/generated-metadata.json --locale fr-FR
+node scripts/cli.js fetch --slug some-slug --locale fr-FR
+node scripts/cli.js apply --input seo-metadata-work/generated-metadata.json --locale fr-FR
 ```
 
 **A config stored somewhere else:**
 
 ```bash
-node bin/seo-metadata-skill.js fetch --slug some-slug --config path/to/seo-metadata.config.json
+node scripts/cli.js fetch --slug some-slug --config path/to/seo-metadata.config.json
 ```
 
 ---
@@ -568,6 +617,11 @@ Remove the `canonicalUrl` or `schema` block to turn that field off entirely.
 
 | Message | Fix |
 |---|---|
+| `node: command not found`, or `Node.js 18 or newer is required` | Install Node.js LTS (see [Install](#install)), restart the terminal or app, and check `node --version`. |
+| `npm ERR!` / errors downloading `xlsx` from `cdn.sheetjs.com` | Not needed any more: there's no `npm install` step. Pull the latest version, delete any old `node_modules/`, and run the commands directly. |
+| `Cannot find module '../vendor/…'` | The skill copy is incomplete. Reinstall the plugin, or re-clone. |
+| `fetch failed` / `ENOTFOUND graphql.contentful.com` in Cowork | The sandbox can't reach Contentful. Allow `graphql.contentful.com` and `api.contentful.com` in network egress settings. |
+| Cowork asks for tokens every session | Save them with `setup --local` so they're kept in the selected folder. |
 | `Config file not found` | Copy a config to `./seo-metadata.config.json`, or pass `--config`. |
 | `Missing Contentful …` | Run the `setup` command shown in the error, or run `setup` in a terminal and it asks for the value. `--preview` needs a preview token; `apply --write` needs a management token. |
 | `Cannot query field "…Collection"` | `contentful.contentType` is wrong. Use the content type **ID** from Contentful. |
@@ -583,9 +637,13 @@ Remove the `canonicalUrl` or `schema` block to turn that field off entirely.
 ## Repository layout
 
 ```
-bin/seo-metadata-skill.js     CLI entry point
-scripts/                      fetch / derive / export / apply
+scripts/cli.js     CLI entry point
+.claude-plugin/plugin.json     plugin manifest (lets the zip be used with "Upload plugin")
+dist/seo-metadata.zip         installable skill zip, rebuilt with npm run package
+scripts/cli.js                CLI entry point
+scripts/                      fetch / derive / export / apply, plus package-skill.js (builds the fallback zip)
 lib/                          Contentful client, query builders, rich-text + derive helpers
+vendor/                       bundled dependencies (commander, SheetJS xlsx) — no npm install needed
 rules/*.template.md           blank rule-doc templates
 config.example.json           blank config
 examples/payden-and-rygel/    complete worked example (config, rules, reference data, source PDFs)

@@ -2,3 +2,9 @@ node_modules/
 .env
 seo-metadata-work/
 *.log
+.seo-metadata/
+
+# Project working copies (a project config/rules kept in this folder) — never publish them
+/seo-metadata.config.json
+/reference-data.json
+/rules/*-spec.md

@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-const { Command } = require('commander');
+const nodeMajor = Number(process.versions.node.split('.')[0]);
+if (nodeMajor < 18) {
+  console.error(
+    `Node.js 18 or newer is required (found ${process.versions.node}).\n` +
+      'Install the LTS release from https://nodejs.org, or: macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`.'
+  );
+  process.exit(1);
+}
+
+// Vendored (vendor/commander) so the skill needs no `npm install`.
+const { Command } = require('../vendor/commander');
 const program = new Command();
 
 program
@@ -8,17 +18,18 @@ program
 
 program
   .command('setup')
-  .description('Save Contentful credentials once per user (stored outside any project). With no flags: shows what is set, and in a terminal asks for anything missing')
+  .description('Save Contentful credentials once per user (stored outside any project, or in ./.seo-metadata/ with --local). With no flags: shows what is set, and in a terminal asks for anything missing')
   .option('--space-id <id>', 'Contentful space ID')
   .option('--access-token <token>', 'Content Delivery API access token')
   .option('--preview-token <token>', 'Content Preview API token (only for --preview)')
   .option('--management-token <token>', 'Content Management API token (only for apply --write)')
   .option('--environment-id <id>', 'Contentful environment ID (default: master)')
   .option('--locale <code>', 'default locale')
-  .option('--clear', 'delete all stored credentials')
+  .option('--local', 'store credentials in ./.seo-metadata/credentials.json (gitignored) instead of the per-user file; use in Cowork, where the home folder does not persist')
+  .option('--clear', 'delete the stored credentials file in use')
   .action(async (opts) => {
     try {
-      await require('../scripts/setup').run(opts);
+      await require('./setup').run(opts);
     } catch (err) {
       console.error('Error:', err.message);
       process.exitCode = 1;
@@ -44,7 +55,7 @@ program
   .option('--out-file <name>', 'output filename (default: fetched-entries.json)')
   .action(async (opts) => {
     try {
-      await require('../scripts/fetch-entries').run(opts);
+      await require('./fetch-entries').run(opts);
     } catch (err) {
       console.error('Error:', err.message);
       process.exitCode = 1;
@@ -62,7 +73,7 @@ program
   .option('--out-file <name>', 'write all rows to this single file instead of updating inputs in place')
   .action((opts) => {
     try {
-      require('../scripts/derive-metadata').run(opts);
+      require('./derive-metadata').run(opts);
     } catch (err) {
       console.error('Error:', err.message);
       process.exitCode = 1;
@@ -79,7 +90,7 @@ program
   .option('--out-file <name>', 'output filename without extension (default: metadata-export)')
   .action((opts) => {
     try {
-      require('../scripts/export-metadata').run(opts);
+      require('./export-metadata').run(opts);
     } catch (err) {
       console.error('Error:', err.message);
       process.exitCode = 1;
@@ -97,7 +108,7 @@ program
   .option('--approved', 'confirm the user explicitly approved this write; required for --write/--publish in non-interactive shells')
   .action(async (opts) => {
     try {
-      await require('../scripts/apply-metadata').run({ ...opts, write: opts.write || opts.publish });
+      await require('./apply-metadata').run({ ...opts, write: opts.write || opts.publish });
     } catch (err) {
       console.error('Error:', err.message);
       process.exitCode = 1;
