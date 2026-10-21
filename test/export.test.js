@@ -10,7 +10,7 @@ test('writes an xlsx that reads back with the vendored library', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-export-'));
   const input = path.join(dir, 'rows.json');
   fs.writeFileSync(input, JSON.stringify([
-    { entryId: 'a', slug: 's-a', title: 'Title A', description: 'Desc A', keywords: ['k1', 'k2'] },
+    { entryId: 'a', slug: 's-a', title: 'Title A', description: 'Desc A', descriptionSource: 'full body', keywords: ['k1', 'k2'] },
     { entryId: 'b', slug: 's-b', title: 'Title B', description: 'Desc B', keywords: ['k3'] },
   ]));
   run({ input: [input], format: 'xlsx', out: dir, config: path.join(dir, 'no-config.json') });
@@ -20,4 +20,5 @@ test('writes an xlsx that reads back with the vendored library', () => {
   assert.strictEqual(rows.length, 2);
   assert.strictEqual(rows[0].title, 'Title A');
   assert.strictEqual(rows[0].keywords, 'k1, k2');
+  assert.strictEqual(rows[0].descriptionSource, 'full body');
 });

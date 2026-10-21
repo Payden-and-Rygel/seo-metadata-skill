@@ -67,6 +67,17 @@ The ready-to-install skill is committed to this repo as [`dist/seo-metadata.zip`
 
 To update, download the zip again and re-upload it, replacing the old skill.
 
+#### Prompt to install the skill
+
+Claude can't upload a skill to Claude desktop for you, but it can get the zip and walk you through the upload. Paste this into a Cowork task with any folder selected:
+
+```text
+Help me install the seo-metadata skill from the zip in GitHub repo Payden-and-Rygel/seo-metadata-skill (private), file dist/seo-metadata.zip on the main branch.
+- If you can reach GitHub with my access, download it into this selected folder as seo-metadata.zip. Otherwise give me this link to download it while signed in to GitHub: https://github.com/Payden-and-Rygel/seo-metadata-skill/raw/main/dist/seo-metadata.zip
+- Then tell me step by step how to upload it: Customize → Add → Upload a skill, choose seo-metadata.zip, and replace the old seo-metadata skill if one is installed.
+- Remind me to turn on code execution and to allow graphql.contentful.com and api.contentful.com in network egress settings (Settings → Capabilities).
+```
+
 #### Prompt to paste in Cowork
 
 After uploading the skill, start a new Cowork task, select your project folder, and paste this prompt:
@@ -99,6 +110,17 @@ npx skills add Payden-and-Rygel/seo-metadata-skill
 ```
 
 Or unzip `dist/seo-metadata.zip` into `~/.claude/skills/`, which gives you `~/.claude/skills/seo-metadata/SKILL.md`.
+
+Or paste this prompt into Claude Code to have it install (or update) the skill from the zip for you:
+
+```text
+Install the seo-metadata skill for me from the zip in GitHub repo Payden-and-Rygel/seo-metadata-skill (private), file dist/seo-metadata.zip on the main branch.
+- Download it with my GitHub access: gh api -H "Accept: application/vnd.github.raw" repos/Payden-and-Rygel/seo-metadata-skill/contents/dist/seo-metadata.zip > a temp file. If gh isn't installed or logged in, tell me to run `gh auth login` and stop.
+- Unzip it into a temp folder. It contains one top-level folder, seo-metadata/.
+- If ~/.claude/skills/seo-metadata already exists, tell me and replace it with the new copy. Create ~/.claude/skills if needed.
+- Check that ~/.claude/skills/seo-metadata/SKILL.md exists and that `node --version` is 18 or newer. Don't run npm install.
+- Tell me to start a new Claude Code session so the skill loads.
+```
 
 To work on the skill itself, clone the repo. There's no install step, and `npm test` runs the unit tests. The `node scripts/cli.js …` commands below assume you're running from a clone. Add `--config <path>` or run from your project folder as needed.
 

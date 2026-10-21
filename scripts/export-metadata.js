@@ -58,6 +58,7 @@ function toExcel(rows, outFile) {
     subtitleLength: r.subtitle ? r.subtitle.length : '',
     description: r.description,
     descriptionLength: r.description.length,
+    descriptionSource: r.descriptionSource || '',
     keywords: Array.isArray(r.keywords) ? r.keywords.join(', ') : r.keywords,
     canonicalUrl: r.canonicalUrl || '',
     schema: r.schema ? JSON.stringify(r.schema) : '',

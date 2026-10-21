@@ -138,7 +138,9 @@ Work one chunk at a time if `fetch` wrote part files: draft `generated-metadata.
 For each fetched entry:
 
 1. Read the project's own rule docs — the paths configured in `rules.titleSpec` / `rules.descriptionSpec` / `rules.keywordsSpec` — and follow them exactly. They define the per-content-type templates, character caps, compliance rules, and (if applicable) any category/product alignment tagging (`rules.referenceData`).
-2. If required source material is missing or unreachable — **fail closed**: don't guess, note it in a `flags` array on that row instead.
+2. Draft the Keywords before the Description: the description rules may check alignment against them.
+3. Record what the Description was drafted from in `descriptionSource` (e.g. `full body (~1,400 words)`, `opening paragraph`, `on-page summary, verbatim`), so a reviewer can confirm the rule doc's read rule was followed. If only the headline, slug or keywords were available, leave `description` empty and flag it.
+4. If required source material is missing or unreachable — **fail closed**: don't guess, note it in a `flags` array on that row instead.
 
 Build a JSON array, one object per entry:
 
@@ -149,6 +151,7 @@ Build a JSON array, one object per entry:
     "slug": "example-slug",
     "title": "...",
     "description": "...",
+    "descriptionSource": "full body (~1,400 words)",
     "keywords": ["term one", "term two"],
     "subtitle": "... (only if rules.subtitleSpec is configured)",
     "flags": []
@@ -203,10 +206,11 @@ Requires `CONTENTFUL_MANAGEMENT_TOKEN` and `contentful.seoMetadata` in config. W
 - **Never print, repeat, or commit credential values** (access, preview, or management tokens). Store them only via `setup`; never write them to a file in the project yourself. The one exception is the gitignored `.seo-metadata/credentials.json` that `setup --local` manages. Never read it directly either.
 - **Never change anything in Contentful without the user's explicit approval — strictly.** Never run `apply --write`, `apply --publish`, or any other Contentful Management API write (create/update/publish/unpublish/delete — via this tool, curl, or any other means) unless the user has explicitly approved that specific write in the current conversation. Always run the dry run first, show the user what would change, and ask. Approval covers only that one run (same input, same flags) — a changed input, a new batch, or adding `--publish` or `--create-missing` needs fresh approval. Creating entries and changing a page's SEO link are writes too. Only pass `--approved` after receiving that approval. Never infer approval from earlier steps, a reviewed export, or general instructions to "finish the task".
 - **Fail closed on missing/unreachable source content** — never fabricate a value the rule docs ask for. Flag it.
-- Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic.
+- Whatever the project's rule docs say about a compliance/safety screen, it always runs last and always wins over any SEO-score heuristic. If it rewrites a draft, re-check the character cap and the readability gate.
+- If the rule docs define a readability gate, it is pass/fail: a description that fails it is blocked regardless of its SEO score.
 - **Never hand-write a Canonical URL or Schema** — they come from `derive` so they match the site's routing. If `derive` flags a row, surface it; don't patch the value by hand.
 - **Never restate the Title verbatim in the Description**, unless the project's own rules say otherwise.
-- Treat any character caps in the rule docs as hard limits — draft to fit, don't rely on `export`'s validator to catch it after the fact.
+- Treat any character caps in the rule docs as hard limits — draft to fit, don't rely on `export`'s validator to catch it after the fact. Fit by rewriting, never by cutting a sentence off partway or adding an ellipsis. If a compliant, complete sentence can't fit, flag it rather than ship a fragment.
 - Category/product alignment tagging (if the project uses it) is additive and optional — don't force a match that isn't genuinely there, and keep the reference data file up to date by hand.
 
 ## Files
